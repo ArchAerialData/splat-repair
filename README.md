@@ -57,15 +57,60 @@ format and round-trips bit-exact.
 
 ## Install
 
-Engine:
+1. Install [Git](https://git-scm.com), [Node.js](https://nodejs.org) and
+   [Python](https://www.python.org) if you do not have them.
+2. Get the code and run the installer:
+
+```bash
+git clone https://github.com/NicolasDrum/splat-repair.git
+```
+
+```bash
+cd splat-repair
+```
+
+```bash
+install.cmd
+```
+
+3. Start the app with `app\start.cmd`.
+
+Everything is installed inside the `splat-repair` folder. To remove Splat
+Repair, delete the folder.
+
+For Deep Fill (PyTorch, gsplat and LaMa), run the installer with `deep`. You
+can do that at any time:
+
+```bash
+install.cmd deep
+```
+
+Without Git you can also download the ZIP from the green Code button on
+GitHub, unpack it and run `install.cmd` in the unpacked folder.
+
+`app\create-shortcut.ps1` puts a shortcut on the desktop:
+
+```bash
+powershell -ExecutionPolicy Bypass -File app\create-shortcut.ps1
+```
+
+## Update
+
+```bash
+update.cmd
+```
+
+This pulls the newest version and rebuilds the app. Add `deep` if you use
+Deep Fill and the release notes mention changed requirements.
+
+<details>
+<summary>Manual install</summary>
 
 ```bash
 cd core
 py -3.11 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 ```
-
-App:
 
 ```bash
 cd app
@@ -74,15 +119,11 @@ npm run build
 npx electron .
 ```
 
-Deep Fill (optional, PyTorch, gsplat and LaMa):
-
 ```bash
 core\.venv\Scripts\python.exe core\setup_deep.py
 ```
 
-The first start downloads the Electron runtime, which takes a moment.
-After the first build, `app\start.cmd` starts the app directly.
-`app\create-shortcut.ps1` puts a shortcut on the desktop.
+</details>
 
 ## Develop
 
