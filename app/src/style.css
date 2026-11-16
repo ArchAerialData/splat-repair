@@ -1,0 +1,520 @@
+/*
+ * Splat Repair in the visual style of nicolasdrum.com: the evening version
+ * (wood black, oak, cream) with the "fireside room" scene, where light whisky
+ * is the leading colour. Always dark: this is a tool window.
+ * The stage is neutral black, not tinted, because colour is judged on it.
+ * No pills, no shadows, no all caps.
+ *
+ * Laid out like Photoshop: menu bar, options bar of the active tool,
+ * toolbar on the left, stage, panels on the right, status bar at the bottom.
+ */
+
+@font-face { font-family: 'Prompt'; src: url('/fonts/prompt-500.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Prompt'; src: url('/fonts/prompt-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Ubuntu'; src: url('/fonts/ubuntu-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Ubuntu'; src: url('/fonts/ubuntu-500.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Ubuntu'; src: url('/fonts/ubuntu-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+
+:root {
+  color-scheme:   dark;
+  --bg:           #100c0a;
+  --bg-2:         #16110e;
+  --panel:        #1c1512;
+  --panel-2:      #251c17;
+  --line:         #3a2e26;
+  --line-soft:    #2a201b;
+  --text:         #f1e9dc;
+  --text-dim:     #b9aa95;
+  --text-faint:   #958775;
+  --lead:         #e5a262;          /* fireside room scene, evening */
+  --lead-tint:    #e5a26222;
+  --on-lead:      #100c0a;
+  --stage:        #050505;          /* neutral, not tinted */
+  --red:          #d0544d;
+  --green:        #9dbb9a;
+  --r-tile:       14px;
+  --r-control:    0.3rem;
+  --font:         'Ubuntu', 'Segoe UI', system-ui, sans-serif;
+  --font-heading: 'Prompt', 'Ubuntu', 'Segoe UI', system-ui, sans-serif;
+  --mono:         ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --ease:         cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+* { box-sizing: border-box; }
+/* Scrollbars narrow and dark, not the light ones Windows draws. */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+/* `hidden` also applies to elements that are otherwise flex or grid. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0; height: 100%;
+  background: var(--bg); color: var(--text);
+  font: 400 14px/1.55 var(--font);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+body { display: flex; flex-direction: column; }
+
+h1 { font: 700 clamp(1.6rem, 1.2rem + 1.6vw, 2.4rem)/1 var(--font-heading); letter-spacing: -.035em; margin: .2rem 0 .5rem; text-wrap: balance; }
+h2 { font: 700 1.35rem/1.1 var(--font-heading); letter-spacing: -.02em; margin: 0; }
+
+button, input, select { font-family: inherit; font-size: inherit; color: inherit; }
+button { cursor: pointer; border: none; background: none; }
+button[disabled] { opacity: .38; cursor: default; }
+
+:focus-visible { outline: 3px solid var(--lead); outline-offset: 3px; }
+
+/* ---------- Header with menus ---------- */
+
+#topbar {
+  display: flex; align-items: center; gap: 4px 14px;
+  min-height: 40px; padding: 0 12px; flex: 0 0 auto;
+  background: var(--bg-2); border-bottom: 1px solid var(--line);
+  position: relative; z-index: 20;
+}
+.brand { display: flex; align-items: center; }
+/* The app's mark: "Gs" in the style of Photoshop's tile, cream with letters in
+   the design's focus green (assets/make_icon.py builds the same tile as the icon). */
+.brand .mark { width: 22px; height: 22px; flex: 0 0 22px; display: block; }
+.file {
+  min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text-faint); font: 400 12px/1 var(--mono); text-align: center;
+}
+.topbar-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+
+.menubar { display: flex; align-items: stretch; height: 40px; flex: 0 0 auto; }
+.menu { position: relative; display: flex; }
+.menu__title {
+  padding: 0 10px; color: var(--text-dim);
+  font: 500 13.5px/40px var(--font-heading); letter-spacing: -.005em;
+  border-bottom: 2px solid transparent;
+  transition: color .18s var(--ease), border-color .18s var(--ease);
+}
+.menu__title:hover, .menu.open .menu__title { color: var(--text); }
+.menu.open .menu__title { border-bottom-color: var(--lead); }
+.menu__list {
+  position: absolute; left: 0; top: 100%; min-width: 16rem; width: max-content; max-width: 30rem;
+  margin: 0; padding: 5px 0; list-style: none;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-control);
+}
+.menu__list--sub { left: 100%; top: -6px; }
+.menu__item {
+  display: grid; grid-template-columns: 1.1rem minmax(0, 1fr) auto; align-items: center; gap: 6px;
+  width: 100%; padding: 6px 14px 6px 8px; text-align: left; color: var(--text);
+  font: 400 13.5px/1.3 var(--font); white-space: nowrap;
+}
+.menu__item:not([disabled]):hover, .menu__item:focus-visible, .menu__item.hot {
+  background: var(--lead); color: var(--on-lead); outline: none;
+}
+.menu__item:not([disabled]):hover .menu__keys,
+.menu__item.hot .menu__keys, .menu__item:focus-visible .menu__keys { color: var(--on-lead); }
+.menu__check { font: 400 12px/1 var(--mono); text-align: center; }
+.menu__keys { color: var(--text-faint); font: 400 12px/1 var(--mono); white-space: nowrap; padding-left: 18px; }
+.menu__sep { height: 1px; margin: 5px 0; background: var(--line); }
+.menu__note { padding: 4px 14px 6px 32px; max-width: 19rem; color: var(--text-faint); font-size: 12.5px; line-height: 1.4; text-wrap: pretty; }
+.menu__item--sub::after { content: '›'; color: var(--text-faint); grid-column: 3; }
+.menu__item--sub .menu__keys { display: none; }
+
+/* ---------- Options bar ---------- */
+
+.optionsbar {
+  flex: 0 0 auto; display: flex; align-items: center; flex-wrap: nowrap; gap: 6px 22px;
+  min-height: 42px; padding: 4px 14px;
+  background: var(--bg-2); border-bottom: 1px solid var(--line);
+}
+.optionsbar__tool { color: var(--lead); font: 500 13.5px/1 var(--font-heading); min-width: 4.6rem; }
+.optgroup { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 22px; flex: 0 1 auto; min-width: 0; }
+.opt { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.opt > label, .opt__label { color: var(--text-dim); font: 500 12.5px/1 var(--font-heading); white-space: nowrap; }
+.opt input[type=range] { width: 120px; }
+.opt .num { min-width: 4.5rem; }
+.opt label.check { display: flex; align-items: center; gap: 7px; color: var(--text); cursor: pointer; }
+.opt__state { color: var(--text-faint); font-size: 12.5px; white-space: nowrap; }
+/* the stamp's controls are one group: they wrap among themselves. Its state
+   line says what the tool hint says, so the hint makes room for it, and the
+   state wraps inside its own box: a longer state ("Source set ...")
+   pushed the whole bar onto a second line and the viewport jumped. */
+#clone-field { flex-wrap: wrap; row-gap: 6px; }
+#clone-state { flex: 1 1 10rem; min-width: 0; white-space: normal; line-height: 1.35; }
+.optionsbar:has(#clone-field:not([hidden])) .optionsbar__hint { display: none; }
+.optionsbar__hint {
+  margin-left: auto; color: var(--text-faint); font-size: 12.5px; line-height: 1.35;
+  flex: 1 1 13rem; min-width: 0; max-width: 34rem; text-align: right; text-wrap: pretty;
+}
+
+/* Switches in one row: a line under the chosen one, no pill. */
+.seg { display: flex; gap: 2px; }
+.seg__btn {
+  padding: 6px 9px; border-radius: 0; border-bottom: 2px solid transparent;
+  color: var(--text-dim); font: 500 13px/1 var(--font-heading);
+  transition: color .18s var(--ease), border-color .18s var(--ease);
+}
+.seg__btn:hover { color: var(--text); border-bottom-color: var(--line); }
+.seg__btn.active { color: var(--text); border-bottom-color: var(--lead); }
+
+/* ---------- Stage ---------- */
+
+#stage { flex: 1 1 auto; display: flex; min-height: 0; min-width: 0; }
+
+#viewport { position: relative; flex: 1 1 auto; min-width: 0; background: var(--stage); overflow: hidden; }
+#canvas { display: block; width: 100%; height: 100%; outline: none; }
+#canvas.brushing { cursor: none; }
+#canvas.outlining { cursor: crosshair; }
+/* Only the tools' guide lines. The shader draws the selection itself. */
+#guides {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+.hint {
+  position: absolute; inset: auto auto 50% 50%;
+  transform: translate(-50%, 50%);
+  width: min(30rem, calc(100% - 4rem)); text-align: left;
+  pointer-events: none;
+}
+.hint .actions { pointer-events: auto; }
+.hint .lede { color: var(--text-dim); max-width: 28rem; margin: 0 0 1.1rem; }
+.hint__keys { margin: 1rem 0 0; font: 400 12px/1.4 var(--mono); }
+
+.busy {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  background: #050505cc; font: 500 14px/1 var(--font-heading); letter-spacing: -.01em;
+  z-index: 5;
+}
+
+/* Brush ring: follows the pointer and shows the real size. */
+#brush-ring {
+  position: absolute; left: 0; top: 0; border-radius: 50%;
+  border: 1.5px solid var(--lead); background: var(--lead-tint);
+  pointer-events: none; translate: -50% -50%; display: none;
+}
+#brush-ring.on { display: block; }
+
+/* The clone stamp's source: a crosshair, not a dot, because a dot would be
+   lost in the splat noise. The dashed circle has the size of the brush
+   and shows how much the stamp picks up there. */
+#clone-src {
+  position: absolute; width: var(--d, 22px); height: var(--d, 22px); translate: -50% -50%;
+  border: 1.5px dashed var(--lead); border-radius: 50%;
+  pointer-events: none; display: none;
+}
+#clone-src.on { display: block; }
+#clone-src::before, #clone-src::after {
+  content: ''; position: absolute; left: 50%; top: 50%; background: var(--lead);
+  translate: -50% -50%;
+}
+#clone-src::before { width: 1.5px; height: 22px; }
+#clone-src::after { height: 1.5px; width: 22px; }
+
+/* What the clone stamp will set, before the engine has set it: in the brush
+   the source, half transparent; while painting, the dabs themselves. Copies
+   of the rendered picture, with no tint or frame over them. */
+#clone-live {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; display: none;
+}
+#clone-peek {
+  position: absolute; left: 0; top: 0; translate: -50% -50%; border-radius: 50%;
+  pointer-events: none; display: none; opacity: .55;
+}
+#clone-live.on, #clone-peek.on { display: block; }
+#brush-ring.peek { background: none; }
+/* While stamping the picture stays visible: only the hint, no dimming. */
+.busy.busy--quiet { background: none; place-items: end center; padding-bottom: 3rem; }
+
+/* View cube at the top right; below it home, frame all, ortho, up axis. */
+.navdock {
+  position: absolute; top: 10px; right: 10px; z-index: 3;
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px; width: 124px;
+}
+.viewcube { width: 124px; height: 124px; display: block; cursor: pointer; touch-action: none; }
+.navdock__row { display: grid; grid-template-columns: 32px 32px minmax(0, 1fr); gap: 4px; }
+.navbtn {
+  position: relative; isolation: isolate; overflow: hidden;
+  height: 30px; display: grid; place-items: center;
+  background: #16110ee6; border: 1px solid var(--line); border-radius: var(--r-control);
+  color: var(--text-dim); font: 500 12px/1 var(--font-heading);
+  transition: color .3s var(--ease), border-color .3s var(--ease);
+}
+.navbtn::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: var(--lead); transform: scaleX(0); transform-origin: left center;
+  transition: transform .52s var(--ease-out);
+}
+.navbtn:not([disabled]):hover::before { transform: scaleX(1); }
+.navbtn:not([disabled]):hover { color: var(--on-lead); border-color: var(--lead); }
+.navbtn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.navbtn.active { color: var(--text); border-color: var(--lead); }
+.navbtn--wide { width: 100%; }
+
+.toast {
+  position: absolute; left: 50%; bottom: 18px; translate: -50% 0; z-index: 4;
+  padding: 7px 12px; background: #16110ee6; border: 1px solid var(--line);
+  border-radius: var(--r-control); color: var(--text); font: 400 12.5px/1.3 var(--mono);
+  pointer-events: none;
+}
+
+/* ---------- Toolbar on the left ---------- */
+
+.toolbar {
+  flex: 0 0 64px; display: flex; flex-direction: column; gap: 2px; padding: 8px 4px;
+  background: var(--bg-2); border-right: 1px solid var(--line); overflow-y: auto;
+}
+.tool {
+  padding: 9px 10px; border-radius: 0; border-bottom: 2px solid transparent;
+  color: var(--text-dim); font: 500 13.5px/1 var(--font-heading);
+  transition: color .18s var(--ease), border-color .18s var(--ease), background-color .18s var(--ease);
+}
+.tool:hover { color: var(--text); border-bottom-color: var(--line); }
+.tool.active { color: var(--text); border-bottom-color: var(--lead); }
+.tool[disabled] { opacity: .35; cursor: default; }
+.tool[disabled]:hover { color: var(--text-dim); border-bottom-color: transparent; }
+/* main.ts finds the reach and handle switches by .tool; in the options bar
+   they look like every other switch there */
+.seg .tool { padding: 6px 9px; font-size: 13px; }
+
+.tool--icon {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 2px 7px; border-bottom: none; border-left: 2px solid transparent;
+  border-radius: 0 var(--r-control) var(--r-control) 0;
+}
+.tool--icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.tool--icon span { font: 500 10.5px/1 var(--font-heading); letter-spacing: -.01em; }
+.tool--icon:hover { border-left-color: var(--line); background: var(--panel); }
+.tool--icon.active { border-left-color: var(--lead); background: var(--panel); color: var(--text); }
+/* the bar scrolls, so a ring outside the button was cut off at its edge */
+.toolbar .tool:focus-visible { outline-offset: -3px; }
+
+/* ---------- Panels on the right ---------- */
+
+#panel {
+  flex: 0 0 19rem; min-width: 0; padding: 10px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--bg-2); border-left: 1px solid var(--line);
+}
+.tile {
+  background: var(--panel); border-radius: var(--r-tile);
+  padding: 13px 15px 14px; min-inline-size: 0;
+}
+.label {
+  margin: 0 0 10px; color: var(--lead);
+  font: 500 13px/1 var(--font-heading); letter-spacing: -.005em;
+}
+/* "Beta" beside the heading of a paused tool: small and quiet, no pill. */
+.beta { margin-left: 5px; color: var(--text-faint); font: 400 11px/1 var(--mono); }
+.hintline { margin: 9px 0 0; font-size: 12.5px; line-height: 1.45; }
+.quiet { color: var(--text-faint); }
+
+/* A collapsible field: the label is the heading, a plus instead of an arrow. */
+details.panel > summary {
+  list-style: none; cursor: pointer; display: flex; justify-content: space-between;
+  align-items: center; margin: 0;
+}
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary::after {
+  content: '+'; color: var(--text-faint); font: 400 16px/1 var(--mono);
+  transition: rotate .2s var(--ease);
+}
+details.panel[open] > summary { margin-bottom: 10px; }
+details.panel[open] > summary::after { rotate: 45deg; }
+details.panel > summary:hover::after { color: var(--text); }
+
+details.more { margin-top: 12px; border-top: 1px solid var(--line-soft); padding-top: 9px; }
+details.more > summary {
+  list-style: none; cursor: pointer; display: flex; justify-content: space-between;
+  color: var(--text-dim); font: 500 12.5px/1.2 var(--font-heading);
+}
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::after { content: '+'; color: var(--text-faint); font: 400 15px/1 var(--mono); transition: rotate .2s var(--ease); }
+details.more[open] > summary { margin-bottom: 10px; }
+details.more[open] > summary::after { rotate: 45deg; }
+
+.selcount { margin: 0 0 10px; font: 500 15px/1.3 var(--font-heading); letter-spacing: -.01em; }
+
+.tools { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 2px; }
+.tools--wide { margin-bottom: 2px; }
+
+/* History: one row per step, the current state marked with the leading line. */
+.history {
+  list-style: none; margin: 0 0 10px; padding: 0; max-height: 15rem; overflow-y: auto;
+  display: flex; flex-direction: column;
+}
+.history__row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: baseline;
+  width: 100%; padding: 5px 8px; text-align: left;
+  border-left: 2px solid transparent; color: var(--text-dim);
+  font: 400 13px/1.35 var(--font);
+}
+.history__row:hover { background: var(--panel-2); color: var(--text); }
+.history__row.current { border-left-color: var(--lead); color: var(--text); background: var(--panel-2); }
+.history__row.future { color: var(--text-faint); }
+.history__row .history__kind { color: var(--text-faint); font: 400 11px/1 var(--mono); }
+.history__row span:first-child { min-width: 0; overflow-wrap: anywhere; }
+
+/* Progress: a running hairline, not a percentage bar. */
+.busy { flex-direction: column; gap: 14px; }
+.busy__bar {
+  width: min(18rem, 60%); height: 2px; background: var(--line); overflow: hidden;
+}
+.busy__fill {
+  display: block; height: 100%; width: 0%; background: var(--lead);
+  transition: width .35s var(--ease);
+}
+
+/* ---------- Fields ---------- */
+
+.field { margin-top: 11px; }
+.field:first-of-type { margin-top: 0; }
+.field--gap { margin-top: 16px !important; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.field label {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  margin-bottom: 6px; color: var(--text-dim);
+  font: 500 12.5px/1 var(--font-heading);
+}
+.num { color: var(--text); font: 400 12px/1 var(--mono); }
+
+/* Checkboxes: flush left, the box in the leading colour. */
+.field label.check {
+  justify-content: flex-start; gap: 8px; margin: 10px 0 4px;
+  color: var(--text); cursor: pointer;
+}
+input[type=checkbox] {
+  width: 14px; height: 14px; margin: 0; accent-color: var(--lead); cursor: pointer;
+}
+
+input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 18px; background: transparent; cursor: pointer;
+}
+input[type=range]::-webkit-slider-runnable-track {
+  height: 2px; background: var(--line); border-radius: 0;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 12px; height: 12px; margin-top: -5px;
+  background: var(--lead); border: none; border-radius: 0;
+}
+input[type=range]:disabled { opacity: .4; cursor: default; }
+
+select {
+  width: 100%; padding: 8px 10px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--r-control); color: var(--text);
+}
+select:focus-visible { border-color: var(--lead); }
+
+/* Crop box: axis, from, to. Three rows, no space wasted. */
+.crop {
+  display: grid; grid-template-columns: auto minmax(0,1fr) minmax(0,1fr);
+  align-items: center; gap: 2px 8px;
+}
+.crop__ax { color: var(--text-faint); font: 400 11.5px/1 var(--mono); }
+
+/* ---------- Buttons: wipe from the left, no arrow, no pill ---------- */
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions--stack { flex-direction: column; }
+.actions--stack .btn { width: 100%; }
+.actions--stack + .actions--stack, .actions--stack .actions--pair { margin-top: 0; }
+.actions--pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 8px; }
+.actions--pair .btn { width: 100%; }
+.actions--row { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.4rem, 1fr)); gap: 6px; }
+.actions--row .btn { padding: 0 6px; font-size: 12.5px; letter-spacing: -.01em; white-space: nowrap; }
+
+.btn {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 2.6rem; padding: 0 14px;
+  border-radius: var(--r-control);
+  font: 500 13.5px/1 var(--font-heading); letter-spacing: -.005em;
+  transition: color .3s var(--ease);
+}
+.btn--sm { min-height: 2.05rem; padding: 0 11px; font-size: 13px; }
+.btn::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: var(--lead); transform: scaleX(0); transform-origin: left center;
+  transition: transform .52s var(--ease-out);
+}
+.btn:not([disabled]):hover::before { transform: scaleX(1); }
+.btn:not([disabled]):hover { color: var(--on-lead); }
+
+.btn--primary { background: var(--text); color: var(--bg); }
+.btn--soft { color: var(--text); box-shadow: inset 0 -1px 0 0 var(--line); }
+.btn--ghost { color: var(--text-dim); border: 1px solid var(--line); }
+.btn--ghost:not([disabled]):hover { border-color: var(--lead); }
+
+/* ---------- Footer, set like film credits ---------- */
+
+#statusbar {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  min-height: 28px; padding: 5px 14px;
+  background: var(--bg-2); border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.rec { color: var(--text-faint); font: 400 11.5px/1.3 var(--mono); }
+#status-msg { color: var(--text-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#status-msg.err { color: var(--red); }
+#status-msg.ok { color: var(--green); }
+.sep { color: var(--line); }
+.statusbar__nav { margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+
+#renderer-badge { color: var(--text-faint); }
+
+/* ---------- Help: all keys on one card ---------- */
+
+.overlay {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+  background: #050505b8; padding: 24px;
+}
+.overlay__card {
+  width: min(62rem, 100%); max-height: calc(100vh - 48px); overflow: auto;
+  border: 1px solid var(--line); padding: 22px 26px 24px;
+}
+.overlay__head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
+.overlay__body { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 18px 32px; }
+.keys { margin: 0; }
+.keys .label { margin-bottom: 8px; }
+/* the mouse is the part people look up first: two columns wide */
+.keys:first-child { grid-column: span 2; }
+@media (max-width: 64rem) { .keys:first-child { grid-column: auto; } }
+.keys__row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: baseline;
+  padding: 5px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px;
+}
+.keys__row kbd { color: var(--text); font: 400 12px/1.3 var(--mono); text-align: right; }
+.keys__row span { color: var(--text-dim); }
+
+/* ---------- Drop: a file held over the window ---------- */
+
+.drop {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  background: #050505c4; padding: 24px; pointer-events: none;
+}
+.drop__card {
+  width: min(30rem, 100%); padding: 26px 28px 24px;
+  background: color-mix(in oklab, var(--lead) 14%, var(--panel));
+}
+.drop__card h2 { font-size: 1.7rem; letter-spacing: -.03em; }
+.drop__line { margin: 10px 0 0; color: var(--text-dim); line-height: 1.45; text-wrap: pretty; }
+.drop--busy .drop__card { background: var(--panel); }
+.drop--busy .label { color: var(--text-faint); }
+
+/* Narrow window: the bar may shrink, nothing is cut off. */
+@media (max-width: 80rem) { .optionsbar__hint { display: none; } }
+@media (max-width: 62rem) {
+  #panel { flex-basis: 16rem; }
+  .statusbar__nav { display: none; }
+  .opt input[type=range] { width: 90px; }
+}
+@media (max-width: 46rem) {
+  #stage { flex-direction: column; }
+  .toolbar { flex: 0 0 auto; flex-direction: row; border-right: none; border-bottom: 1px solid var(--line); }
+  #panel { flex: 0 0 auto; max-height: 46%; border-left: none; border-top: 1px solid var(--line); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

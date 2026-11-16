@@ -1,0 +1,24 @@
+{
+  "name": "splat-editor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:electron": "node build.mjs",
+    "build:renderer": "vite build",
+    "build": "node build.mjs && vite build",
+    "dev": "node dev.mjs",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit",
+    "smoke": "electron smoke/main.cjs"
+  },
+  "dependencies": {
+    "@types/node": "^26.6.6",
+    "electron": "^45.2.1",
+    "esbuild": "^0.28.2",
+    "playcanvas": "^2.23.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  },
+  "main": "dist/electron/main.mjs"
+}

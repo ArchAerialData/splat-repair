@@ -1,0 +1,28 @@
+# dependencies and builds
+node_modules/
+app/dist/
+core/.venv/
+__pycache__/
+*.pyc
+
+# models and caches
+core/models/
+.cache/
+
+# scans, results, screenshots from test runs
+*.ply
+*.spz
+*.splat
+app/shots/
+data/
+
+# secrets and local settings
+.env
+.env.*
+*.pem
+.claude/
+sperrliste.txt
+
+# OS
+Thumbs.db
+.DS_Store

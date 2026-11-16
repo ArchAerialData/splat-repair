@@ -1,0 +1,17 @@
+# Base dependencies of the Splat Repair engine (core/server.py, core/splatcore).
+# With these the editor opens, edits and saves splats and Fast Fill works.
+#
+#     python -m pip install -r requirements.txt
+#
+# Python 3.10 to 3.13.
+#
+# Deep Fill needs more: PyTorch with CUDA, gsplat and LaMa (plus OpenCV as the
+# fallback inpainter). Those are not listed here because their install order
+# matters; run setup_deep.py for them:
+#
+#     python setup_deep.py
+
+numpy>=1.24
+scipy>=1.10
+pillow>=9.5
+zstandard>=0.21

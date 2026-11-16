@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self';
+               img-src 'self' data: blob:; connect-src 'self' data: blob:;
+               worker-src 'self' blob:">
+<title>Splat Repair</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<!-- Menu bar as in Photoshop. ui/shell.ts builds the menus from one list,
+     so menu, shortcuts and help never drift apart. -->
+<header id="topbar">
+  <div class="brand" title="Splat Repair"><svg class="mark" aria-hidden="true" viewBox="0 0 64 64"><rect width="64" height="64" rx="11.52" fill="#F1E9DC"/><rect x="4.8" y="4.8" width="54.4" height="54.4" rx="8.16" fill="none" stroke="#6C8A5F" stroke-width="2.24"/><text x="32" y="42.4" text-anchor="middle" font-family="Prompt, system-ui, sans-serif" font-weight="700" font-size="31" letter-spacing="-1" fill="#6C8A5F">Gs</text></svg></div>
+  <nav id="menubar" class="menubar" role="menubar" aria-label="Menu"></nav>
+  <div class="file" id="file-name">No file open</div>
+  <div class="topbar-right">
+    <span class="rec" id="renderer-badge">–</span>
+    <button class="btn btn--ghost btn--sm" id="btn-open" title="Open a splat (Ctrl+O)">Open</button>
+  </div>
+</header>
+
+<!-- Options bar: only what the active tool sets. -->
+<div id="optionsbar" class="optionsbar">
+  <span class="optionsbar__tool" id="opt-tool">Orbit</span>
+  <div class="optgroup" id="brush-tile">
+    <div class="opt" id="opt-selmode" title="How a stroke combines with the selection. While dragging, Shift adds and Ctrl subtracts.">
+      <span class="opt__label">Mode</span>
+      <div class="seg" role="group" aria-label="Mode">
+        <button class="seg__btn active" data-selmode="replace">New</button>
+        <button class="seg__btn" data-selmode="add">Add</button>
+        <button class="seg__btn" data-selmode="subtract">Subtract</button>
+      </div>
+    </div>
+    <div class="opt" id="brush-size-field">
+      <label for="brush-size" title="Brush diameter. The + and − keys change it.">Size</label>
+      <input type="range" id="brush-size" min="8" max="260" step="1" value="60">
+      <span class="num" id="brush-size-v">60 px</span>
+    </div>
+    <div class="opt" id="brush-depth-field">
+      <label for="brush-depth" title="How far behind the visible surface the selection reaches, in pixels at the surface. Raise it if a blurry blob lies deeper. After a brush stroke, the slider recomputes that same stroke.">Depth</label>
+      <input type="range" id="brush-depth" min="0.2" max="6" step="0.1" value="1.5">
+      <span class="num" id="brush-depth-v">1.5 · 15 px</span>
+    </div>
+    <div class="opt" id="depth-mode-field" title="Surface: you select only what you see, and behind it as deep as the Depth slider says. Through: you select everything inside the outline, the back too. Alt+Z toggles.">
+      <span class="opt__label">Reach</span>
+      <div class="seg" role="group" aria-label="Reach">
+        <button class="tool seg__btn active" data-reach="surface" aria-pressed="true">Surface</button>
+        <button class="tool seg__btn" data-reach="through" aria-pressed="false">Through</button>
+      </div>
+    </div>
+    <div class="opt" id="objsel-field">
+      <label class="check" title="On: paint over a sign, a print or a pole and you get the whole thing. The outline grows to its sides, its faint edges and its drop shadow, and Repair takes all of that with it. If it stands free in front of an intact surface, it is only deleted. Off: exactly what is painted gets repaired. The same holds once you subtract from the selection: then exactly the selection is repaired."><input type="checkbox" id="obj-select" checked> Detect object</label>
+    </div>
+    <div class="opt" id="clone-field" hidden>
+      <label for="clone-match" title="How strongly the stamp's colour is matched to the surroundings of the target.">Match</label>
+      <input type="range" id="clone-match" min="0" max="1" step="0.05" value="0.6">
+      <span class="num" id="clone-match-v">0.60</span>
+      <label for="clone-hard" title="How hard the edge of the stamp is. Soft blends it into the surroundings, hard gives it a sharp edge.">Hardness</label>
+      <input type="range" id="clone-hard" min="0" max="0.95" step="0.05" value="0.7">
+      <span class="num" id="clone-hard-v">0.70</span>
+      <label class="check" title="On: the offset to the source stays the same across all strokes. Off: every stroke starts at the source again."><input type="checkbox" id="clone-aligned" checked> Aligned</label>
+      <span class="opt__state" id="clone-state">Alt + click sets the source.</span>
+    </div>
+  </div>
+  <div class="optgroup" id="xform-field" hidden>
+    <div class="opt">
+      <span class="opt__label">Handles</span>
+      <div class="seg" role="group" aria-label="Handles">
+        <button class="tool seg__btn active" data-xf="translate">Move</button>
+        <button class="tool seg__btn" data-xf="rotate">Rotate</button>
+        <button class="tool seg__btn" data-xf="scale">Scale</button>
+      </div>
+    </div>
+    <span class="opt__state" id="xform-state">Select something first.</span>
+  </div>
+  <span class="optionsbar__hint" id="tool-hint"></span>
+</div>
+
+<main id="stage">
+  <!-- Toolbar on the left, as in Photoshop. The letter is the key. -->
+  <nav id="toolbar" class="toolbar" aria-label="Tools">
+    <button class="tool tool--icon active" id="tool-orbit" data-tool="orbit" title="Orbit (V)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><ellipse cx="12" cy="12" rx="9.5" ry="4" transform="rotate(-24 12 12)"/></svg>
+      <span>Orbit</span></button>
+    <button class="tool tool--icon" id="tool-brush" data-tool="brush" title="Brush (B)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 3.5 11 13"/><path d="M11 13c-2.5-.6-4.6 1-5 3.4-.3 1.8-1.3 2.8-2.5 3.1 3.6 1.2 7.6.4 8.6-2.6.4-1.3 0-2.9-1.1-3.9z"/></svg>
+      <span>Brush</span></button>
+    <button class="tool tool--icon" id="tool-lasso" data-tool="lasso" title="Lasso (L)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 16.5C3.8 15 2.8 12.4 4 9.8 5.6 6.4 10.6 4.6 15.2 5.4c4.4.8 6.3 3.8 4.6 6.7-1.6 2.8-6.6 4.3-10.4 3.8"/><path d="M9.4 15.9c-.9 1.3-.6 2.9.6 3.6 1 .6 1.6 1.4 1.4 2.5"/></svg>
+      <span>Lasso</span></button>
+    <button class="tool tool--icon" id="tool-box" data-tool="box" title="Rectangle (R)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V4h3M10 4h4M17 4h3v3M20 10v4M20 17v3h-3M14 20h-4M7 20H4v-3M4 14v-4"/></svg>
+      <span>Rectangle</span></button>
+    <button class="tool tool--icon" id="tool-clone" data-tool="clone" title="Clone Stamp (S)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 11.5V9a2.5 2.5 0 1 1 5 0v2.5"/><path d="M5 15.5c0-2.2 1.8-4 4-4h6c2.2 0 4 1.8 4 4v1H5z"/><path d="M5 20h14"/></svg>
+      <span>Stamp</span></button>
+    <button class="tool tool--icon" id="tool-xform" data-tool="xform" title="Move (G)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/><path d="m9 5.5 3-2.5 3 2.5M9 18.5l3 2.5 3-2.5M5.5 9 3 12l2.5 3M18.5 9l2.5 3-2.5 3"/></svg>
+      <span>Move</span></button>
+  </nav>
+
+  <div id="viewport">
+    <canvas id="canvas"></canvas>
+    <canvas id="guides"></canvas>
+    <div id="brush-ring"></div>
+    <div id="clone-src"></div>
+
+    <!-- View cube: click a face, edge or axis; dragging orbits. -->
+    <div class="navdock" id="navdock">
+      <canvas id="viewcube" class="viewcube" aria-label="View cube"></canvas>
+      <div class="navdock__row">
+        <button class="navbtn" id="btn-home" title="Home view (Home)" aria-label="Home view">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9h11v-9"/><path d="M10.2 19v-5h3.6v5"/></svg></button>
+        <button class="navbtn" id="btn-frame-all" title="Frame all (.)" aria-label="Frame all">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><rect x="9" y="9" width="6" height="6"/></svg></button>
+        <button class="navbtn navbtn--text" id="btn-ortho" title="Orthographic or perspective (Num 5)">Ortho</button>
+      </div>
+      <button class="navbtn navbtn--text navbtn--wide" id="btn-up" disabled
+              title="Which axis of the file points up (U key). 3DGS scans almost always use −Y. Remembered for this file.">Up −Y</button>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <div id="hint" class="hint">
+      <p class="label">Start</p>
+      <h1>Open a splat</h1>
+      <p class="lede">Then paint over the spot you want gone, and the tool
+        rebuilds the surface underneath.</p>
+      <div class="actions"><button class="btn btn--primary" id="btn-open-2">Open Splat</button></div>
+      <p class="hint__keys quiet">PLY, SPZ or SPLAT · Ctrl+O or drag into the window · F1 shows all keys</p>
+    </div>
+    <div id="busy" class="busy" hidden>
+      <span id="busy-text">Loading …</span>
+      <span class="busy__bar"><i class="busy__fill" id="busy-fill"></i></span>
+    </div>
+  </div>
+
+  <aside id="panel">
+    <section class="tile" id="sel-tile">
+      <p class="label">Selection</p>
+      <p class="selcount" id="sel-count">Nothing selected.</p>
+      <div class="actions actions--row">
+        <button class="btn btn--ghost btn--sm" id="btn-deselect" disabled title="Deselect (Ctrl+D)">Deselect</button>
+        <button class="btn btn--ghost btn--sm" id="btn-invert" disabled title="Invert selection (Ctrl+Shift+I)">Invert</button>
+        <button class="btn btn--ghost btn--sm" id="btn-frame-sel" disabled title="Frame the selection (F)">Frame</button>
+      </div>
+    </section>
+
+    <section class="tile" id="repair-tile">
+      <p class="label">Repair</p>
+      <div class="tools tools--wide">
+        <button class="tool active" id="depth-quick" data-depth="quick" title="Fills in a picture of the surface, in a few seconds">Fast Fill</button>
+        <button class="tool" id="depth-deep" data-depth="deep" disabled title="With inpainting, several seconds">Deep Fill</button>
+      </div>
+      <p class="hintline quiet" id="depth-hint">Fills in a picture of the surface, in a few seconds.</p>
+      <div class="field" id="deep-fill-field" hidden>
+        <label for="deep-fill">Fill with</label>
+        <select id="deep-fill">
+          <option value="lama" selected>LaMa, wide view</option>
+          <option value="photoshop">Photoshop (Generative Fill)</option>
+          <option value="patch">LaMa, spot only</option>
+        </select>
+        <p class="hintline quiet" id="deep-fill-hint">Renders the surface head-on
+          with plenty of surroundings, fills the picture and projects it back onto the splats.</p>
+      </div>
+      <div class="actions actions--stack">
+        <button class="btn btn--primary" id="btn-repair" disabled title="Remove the selection and rebuild the surface underneath (Shift+F5)">Repair</button>
+        <div class="actions actions--pair">
+          <button class="btn btn--soft" id="btn-reroll" disabled title="Fill the same spot again, differently">Retry</button>
+          <button class="btn btn--soft" id="btn-delete" disabled title="Delete the selection without filling (Del)">Delete</button>
+        </div>
+      </div>
+      <details class="more" id="repair-more">
+        <summary>Advanced</summary>
+        <div class="field" id="fill-engine-field">
+          <label for="fill-engine" title="What Fast Fill fills the spot with. In picture: the surface is filled as a picture, which then becomes splats. Copy: the earlier method, it places splats from the surroundings into the spot. Holds until you quit, then back to In picture.">Fill</label>
+          <select id="fill-engine">
+            <option value="image" selected>In picture (default)</option>
+            <option value="copy">Copy (previous)</option>
+          </select>
+          <p class="hintline quiet" id="fill-engine-hint">Method, Density, Texture and Color Smoothing
+            only apply here when the copying fill steps in.</p>
+        </div>
+        <div class="field">
+          <label for="mode">Method</label>
+          <select id="mode">
+            <option value="auto">Automatic</option>
+            <option value="patch">Transplant patch</option>
+            <option value="rim">Seed from rim</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="density" title="How densely the new splats are placed, relative to the surroundings.">Density <span class="num" id="density-v">1.00</span></label>
+          <input type="range" id="density" min="0.3" max="2.5" step="0.05" value="1">
+        </div>
+        <div class="field">
+          <label for="roughness" title="How much of the surroundings' unevenness the new surface takes on.">Texture <span class="num" id="roughness-v">1.00</span></label>
+          <input type="range" id="roughness" min="0" max="1.5" step="0.05" value="1">
+        </div>
+        <div class="field">
+          <label for="colorsmooth" title="How strongly the colour of the new surface is smoothed.">Color Smoothing <span class="num" id="colorsmooth-v">0.50</span></label>
+          <input type="range" id="colorsmooth" min="0" max="1" step="0.05" value="0.5">
+        </div>
+        <div class="field" id="deep-detail-field" hidden>
+          <label for="deep-detail" title="Auto: measures how much fine grain the inpainter lost and brings it back from the copied surface. 0: the inpainter decides everything.">Detail
+            <span class="num" id="deep-detail-v">auto</span></label>
+          <input type="range" id="deep-detail" min="-0.05" max="1" step="0.05" value="-0.05">
+        </div>
+      </details>
+    </section>
+
+    <!-- Shadow and Solidify are paused: only shown with "Beta Tools" in the Edit
+         menu (ui/shell.ts, setBeta). `data-beta` marks everything that belongs to them. -->
+    <details class="tile panel" id="retouch-tile" data-panel="retouch" data-beta hidden open>
+      <summary class="label"><span>Retouch <span class="beta">Beta</span></span></summary>
+      <div class="field">
+        <label for="shadow-mode">Shadow</label>
+        <select id="shadow-mode">
+          <option value="auto">Find Shadow</option>
+          <option value="lift">Lighten</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="shadow-strength"><span id="shadow-strength-l">Strength</span>
+          <span class="num" id="shadow-strength-v">100%</span></label>
+        <input type="range" id="shadow-strength" min="0" max="1" step="0.05" value="1">
+      </div>
+      <div class="actions actions--stack">
+        <button class="btn btn--soft" id="btn-unshadow" disabled>Remove Shadow</button>
+      </div>
+      <p class="hintline" id="shadow-note" hidden></p>
+      <div id="shadow-instead" hidden>
+        <div class="actions actions--stack">
+          <button class="btn btn--ghost" id="btn-shadow-instead">Lighten instead</button>
+        </div>
+      </div>
+      <p class="hintline quiet" id="shadow-hint">Paint generously over the shadow, past
+        its edge too. Where the shadow reaches beyond the stroke, the brush follows it
+        a little and lightens that as well.</p>
+      <div class="field field--gap">
+        <label for="solid-colour">When solidifying</label>
+        <select id="solid-colour">
+          <option value="material">Keep colours</option>
+          <option value="halten">Preserve look</option>
+        </select>
+      </div>
+      <div class="actions actions--stack">
+        <button class="btn btn--soft" id="btn-solidify" disabled>Solidify</button>
+      </div>
+      <p class="hintline quiet">Paint the see-through spot from the view in which
+        it shows through. It becomes as dense as the surface around it.</p>
+    </details>
+
+    <details class="tile panel" id="cleanup-tile" data-panel="cleanup">
+      <summary class="label">Clean Up</summary>
+      <div class="field">
+        <label for="floater-thr" title="The higher, the fewer and more clear-cut the splats.">Floaters
+          <span class="num" id="floater-count">–</span></label>
+        <input type="range" id="floater-thr" min="0.1" max="0.95" step="0.05" value="0.3">
+      </div>
+      <div class="actions actions--stack">
+        <button class="btn btn--soft" id="btn-floaters" disabled>Select</button>
+      </div>
+      <p class="hintline quiet" id="floater-hint">Splats far from any surface, faint or
+        much too large. Haze with only unscanned areas behind it stays. Select first,
+        then look, then delete.</p>
+
+      <div class="field field--gap">
+        <label>Crop Box <span class="num" id="crop-count">off</span></label>
+        <div class="crop">
+          <span class="crop__ax" id="crop-ax-x">X</span>
+          <input type="range" id="crop-x0" min="0" max="1" step="0.005" value="0" aria-label="X from">
+          <input type="range" id="crop-x1" min="0" max="1" step="0.005" value="1" aria-label="X to">
+          <span class="crop__ax" id="crop-ax-y">Y</span>
+          <input type="range" id="crop-y0" min="0" max="1" step="0.005" value="0" aria-label="Y from">
+          <input type="range" id="crop-y1" min="0" max="1" step="0.005" value="1" aria-label="Y to">
+          <span class="crop__ax" id="crop-ax-z">Z</span>
+          <input type="range" id="crop-z0" min="0" max="1" step="0.005" value="0" aria-label="Z from">
+          <input type="range" id="crop-z1" min="0" max="1" step="0.005" value="1" aria-label="Z to">
+        </div>
+        <p class="hintline quiet" id="crop-hint">Sliders run along the file's axes.</p>
+      </div>
+      <div class="actions actions--pair">
+        <button class="btn btn--soft" id="btn-crop" disabled>Crop</button>
+        <button class="btn btn--ghost" id="btn-crop-reset">Reset</button>
+      </div>
+    </details>
+
+    <details class="tile panel" id="history-tile" data-panel="history" open>
+      <summary class="label">History</summary>
+      <ol class="history" id="history-list" aria-label="History"></ol>
+      <div class="actions actions--pair">
+        <button class="btn btn--ghost btn--sm" id="btn-undo" disabled title="Undo (Ctrl+Z)">Undo</button>
+        <button class="btn btn--ghost btn--sm" id="btn-redo" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
+      </div>
+    </details>
+
+    <details class="tile panel" id="export-tile" data-panel="export">
+      <summary class="label">Export</summary>
+      <div class="field">
+        <label for="export-sh">SH bands</label>
+        <select id="export-sh">
+          <option value="">Keep all</option>
+          <option value="1">Band 1 only</option>
+          <option value="0">None (base colour only)</option>
+        </select>
+      </div>
+      <p class="hintline quiet" id="export-hint">Applies to SPZ and PLY. Without bands
+        gloss turns matte; for a scan with 550,000 splats about 21.5 MB with all, 8.6 MB with none.</p>
+      <div class="actions actions--stack">
+        <button class="btn btn--soft" id="btn-export" disabled title="Export (Ctrl+S)">Export</button>
+      </div>
+    </details>
+  </aside>
+</main>
+
+<footer id="statusbar">
+  <span class="rec" id="status-counts">–</span>
+  <span class="sep" aria-hidden="true">/</span>
+  <span class="rec" id="status-msg">starting …</span>
+  <span class="rec statusbar__nav" id="nav-hint"></span>
+</footer>
+
+<div id="help" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="help-title">
+  <div class="overlay__card tile">
+    <div class="overlay__head">
+      <h2 id="help-title">Keys and Mouse</h2>
+      <button class="btn btn--ghost btn--sm" id="help-close">Close</button>
+    </div>
+    <div class="overlay__body" id="help-body" tabindex="0" aria-label="All keys"></div>
+  </div>
+</div>
+
+<!-- Dragging a file into the window opens it (ui/shell.ts, wireDrop). -->
+<div id="drop" class="drop" hidden aria-live="polite">
+  <div class="drop__card tile">
+    <p class="label">Drop</p>
+    <h2 id="drop-title">Release to open</h2>
+    <p class="drop__line" id="drop-line">PLY, SPZ or SPLAT.</p>
+  </div>
+</div>
+
+<script type="module" src="./main.ts"></script>
+</body>
+</html>
