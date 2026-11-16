@@ -85,6 +85,10 @@ can do that at any time:
 install.cmd deep
 ```
 
+During the Deep Fill setup pip prints dependency conflicts for
+`simple-lama-inpainting`. That is expected; the setup ends with "Deep Fill is
+ready" when everything works.
+
 Without Git you can also download the ZIP from the green Code button on
 GitHub, unpack it and run `install.cmd` in the unpacked folder.
 

@@ -59,6 +59,8 @@ def main():
     step(4, "LaMa, without touching PyTorch")
     # --no-deps: it pins torch loosely and would pull the CPU build over the
     # CUDA one we just installed, silently disabling every GPU path.
+    print("   (pip may now report dependency conflicts for simple-lama-inpainting.")
+    print("    That is expected: it is installed without its pinned versions on purpose.)")
     pip("install", "--no-deps", "simple-lama-inpainting")
     pip("install", "--upgrade", "pillow", "opencv-python-headless", "fire")
 
