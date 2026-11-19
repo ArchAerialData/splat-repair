@@ -227,7 +227,7 @@ export class Shell {
         mode('subtract', 'Subtract', 'Ctrl'),
         { note: 'Shift and Ctrl work while dragging, without switching the mode.' },
         '-',
-        { label: 'Lasso and Rectangle Select Through', keys: 'Alt+Z', bind: ['alt+z'],
+        { label: 'Brush, Lasso and Rectangle Select Through', keys: 'Alt+Z', bind: ['alt+z'],
           checked: () => a.through?.() ?? false, run: () => a.setThrough?.(!(a.through?.() ?? false)) },
         { note: 'Off: only what you see. On: everything behind it too.' }
       ] },

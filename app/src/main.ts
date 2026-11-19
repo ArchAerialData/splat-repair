@@ -1,3 +1,4 @@
+import { ThroughBrushRaster } from './engine/through-brush';
 import { selectionMarkers, MARKER_LIMIT } from './ui/selection-inspection';
 /**
  * Splat Repair -- application glue.
@@ -344,7 +345,7 @@ const SEL_LABEL: Record<string, string> = {
 function selectionLabel(): string {
   if (!selCount) return 'Deselect';
   let base = SEL_LABEL[tool] ?? 'Selection';
-  if ((tool === 'lasso' || tool === 'box') && selDepth === 'through') base += ' through';
+  if ((tool === 'brush' || tool === 'lasso' || tool === 'box') && selDepth === 'through') base += ' through';
   return selectMode === 'add' ? `${base} add` : selectMode === 'subtract' ? `${base} subtract` : base;
 }
 
@@ -745,7 +746,16 @@ function forgetStroke() {
  * the splat stream, so nothing has to come back across the bus. The exact index
  * list is worked out once when the stroke ends, where the cost does not matter.
  */
+let lastThroughPreview = 0;
+const throughBrushRaster = new ThroughBrushRaster();
 function previewSelection() {
+  if (selDepth === 'through') {
+    if (performance.now() - lastThroughPreview >= 100) {
+      lastThroughPreview = performance.now();
+      selectThroughBrush(strokeStart ?? undefined);
+    }
+    return;
+  }
   const p = ensureProjection();
   if (!p || !stroke.length) return;
   const depth = Number($<HTMLInputElement>('brush-depth').value);
@@ -774,7 +784,24 @@ function previewSelection() {
  * `base` is the selection the stroke started from (taken at pointerdown);
  * without it, the selection as it stands now.
  */
+function selectThroughBrush(base?: Uint8Array) {
+  const p = ensureProjection();
+  if (!p || !stroke.length) return;
+  const r = canvas.getBoundingClientRect();
+  const w = Math.max(1, Math.ceil(r.width)), h = Math.max(1, Math.ceil(r.height));
+  const mask = throughBrushRaster.update(stroke, w, h);
+  const hits = selectInRegion(p, mask, w, h, {
+    depthMode: 'through', tolPx: 0, perPixelPerUnit: viewer.worldPerPixelPerUnit(), alive: visibleMask()
+  });
+  // This selection has no surface-anchored repair volume or depth restroke.
+  forgetStroke();
+  selView = viewer.viewDirection();
+  setVolume(null);
+  commitHits(hits, base);
+}
+
 function recomputeSelection(base?: Uint8Array) {
+  if (selDepth === 'through') { selectThroughBrush(base); return; }
   const p = ensureProjection();
   if (!p || !stroke.length) return;
   // Lift the stroke onto the surface it touches, then select the 3-D volume it
@@ -1755,7 +1782,7 @@ function applyStates() {
   // The crop preview is folded into the deleted flags here, so it survives
   // the next selection change -- it used to vanish the moment anything was
   // selected, while the crop button stayed armed.
-  if (painting && gpuSel?.ready && tool === 'brush') {
+  if (painting && gpuSel?.ready && tool === 'brush' && selDepth === 'surface') {
     viewer.writeStream(viewer.splat, 'editDel', cropHidden(doc.baseDeleted(), 0));
     if (viewer.generated) {
       viewer.writeStream(viewer.generated, 'editDel', cropHidden(doc.genDeleted(), doc.nBase));
@@ -2486,6 +2513,7 @@ function toolHint(t: Tool): string {
   if (t === 'orbit' && viewer.preset === 'metashape') {
     return 'Left-drag pans · middle-drag orbits · right-drag / wheel zooms. Double-click centres.';
   }
+  if (t === 'brush' && selDepth === 'through') return 'Through brush: paints across all depths, including the far side. Shift adds; Ctrl subtracts.';
   if ((t === 'lasso' || t === 'box') && selDepth === 'through') {
     return 'Through: you select everything inside the outline, the back too. Alt+Z switches back.';
   }
@@ -2529,7 +2557,8 @@ function setTool(next: Tool) {
   }
   $<HTMLElement>('xform-field').hidden = next !== 'xform';
   $<HTMLElement>('depth-mode-field').hidden =
-    next === 'orbit' || next === 'brush' || next === 'clone';
+    next === 'orbit' || next === 'clone' || next === 'xform';
+  $<HTMLInputElement>('brush-depth').disabled = selDepth === 'through';
   refreshDepthLabel();
   showCloneSource();
   lassoPts = [];
@@ -2757,7 +2786,7 @@ applyShadowMode();
 // Only for the brush: lasso and box take the value for their next outline.
 let restrokeQueued = false;
 $<HTMLInputElement>('brush-depth').addEventListener('input', () => {
-  if (tool !== 'brush' || painting || !strokeBase || restrokeQueued) return;
+  if (tool !== 'brush' || selDepth === 'through' || painting || !strokeBase || restrokeQueued) return;
   restrokeQueued = true;
   requestAnimationFrame(() => {
     restrokeQueued = false;
@@ -2914,12 +2943,15 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('.tool[data-xf]')) 
  * buttons show is what the next outline does.
  */
 function setReach(r: DepthMode) {
+  if (painting) return; // A stroke keeps the reach it started with.
   selDepth = r;
+  forgetStroke();
+  $<HTMLInputElement>('brush-depth').disabled = r === 'through';
   for (const o of document.querySelectorAll<HTMLButtonElement>('.tool[data-reach]')) {
     o.classList.toggle('active', o.dataset.reach === r);
     o.setAttribute('aria-pressed', String(o.dataset.reach === r));
   }
-  if (tool === 'lasso' || tool === 'box') $('tool-hint').textContent = toolHint(tool);
+  if (tool === 'brush' || tool === 'lasso' || tool === 'box') $('tool-hint').textContent = toolHint(tool);
 }
 for (const b of document.querySelectorAll<HTMLButtonElement>('.tool[data-reach]')) {
   b.addEventListener('click', () => setReach(b.dataset.reach as DepthMode));
