@@ -107,6 +107,12 @@ def load_inpainter(kind: str = "auto"):
     if kind in ("auto", "lama"):
         try:
             if "lama" not in _LAMA:
+                import os
+                from pathlib import Path
+                # Shared by setup verification and the taskbar-launched app.
+                # Honor an explicit user cache, otherwise keep model weights
+                # beside the engine instead of consuming the system drive.
+                os.environ.setdefault("TORCH_HOME", str(Path(__file__).resolve().parents[1] / "models" / "torch"))
                 from simple_lama_inpainting import SimpleLama
                 _LAMA["lama"] = SimpleLama()
             lama = _LAMA["lama"]

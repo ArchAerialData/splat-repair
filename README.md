@@ -98,8 +98,10 @@ format and round-trips bit-exact.
 - Windows 10 or 11. The code is not tested on macOS or Linux.
 - [Node.js](https://nodejs.org) 22 or newer.
 - Python 3.10 to 3.13.
-- For Deep Fill: an NVIDIA GPU, a CUDA toolkit and the MSVC build tools
-  (gsplat compiles on first use). About 3 GB of downloads.
+- For Deep Fill: a supported NVIDIA GPU and Visual Studio 2019/2022 C++ build
+  tools with a Windows SDK. Setup installs a small CUDA compiler inside the
+  engine environment; it does not replace the graphics driver. About 3.2 GB
+  of downloads, including LaMa and the compiler.
 
 ## Install
 
@@ -134,6 +136,12 @@ install.cmd deep
 During the Deep Fill setup pip prints dependency conflicts for
 `simple-lama-inpainting`. That is expected; the setup ends with "Deep Fill is
 ready" when everything works.
+
+Setup verifies an actual GPU render and LaMa fill before reporting success.
+The taskbar shortcut uses the same environment. Restart the app after setup,
+then select an area and choose **Deep Fill → LaMa, wide view → Repair**.
+See [Deep Fill setup and verification](docs/deep-fill-setup.md) for installation
+locations, supported versions and troubleshooting.
 
 Without Git you can also download the ZIP from the green Code button on
 GitHub, unpack it and run `install.cmd` in the unpacked folder.

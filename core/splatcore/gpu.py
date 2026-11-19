@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional
+import os
 
 import numpy as np
 
@@ -64,29 +65,46 @@ def _ensure_build_env() -> None:
     if os.name != "nt":
         return
     if not os.environ.get("CUDA_HOME"):
-        root = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA"
-        if os.path.isdir(root):
-            vs = sorted(os.listdir(root), reverse=True)
-            if vs:
-                os.environ["CUDA_HOME"] = os.path.join(root, vs[0])
+        # setup_deep installs the official minimal toolkit inside this venv.
+        # Taskbar launches do not inherit a developer terminal's CUDA_PATH.
+        local = os.path.join(sys.prefix, "cuda", "v12.8")
+        if os.path.isfile(os.path.join(local, "bin", "nvcc.exe")):
+            os.environ["CUDA_HOME"] = local
+        elif os.environ.get("CUDA_PATH"):
+            os.environ["CUDA_HOME"] = os.environ["CUDA_PATH"]
+        else:
+            root = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA"
+            if os.path.isdir(root):
+                vs = sorted(os.listdir(root), reverse=True)
+                if vs:
+                    os.environ["CUDA_HOME"] = os.path.join(root, vs[0])
+    cuda_bin = os.path.join(os.environ.get("CUDA_HOME", ""), "bin")
+    if os.path.isdir(cuda_bin) and cuda_bin not in os.environ.get("PATH", "").split(os.pathsep):
+        os.environ["PATH"] = cuda_bin + os.pathsep + os.environ.get("PATH", "")
     _add_msvc_to_path()
 
 
 def _add_msvc_to_path() -> None:
-    """Put cl.exe on PATH if it is installed but not visible.
+    """Activate a supported MSVC toolchain for normal desktop launches.
 
     torch's extension loader runs ``where cl`` on every load, even when the
     extension is already compiled and nothing needs building. Without it the
     load fails with a compiler-version error that has nothing to do with the
     actual problem.
     """
-    import glob
     import os
-    import shutil
     import subprocess
 
-    if shutil.which("cl"):
-        return
+    active_arch = os.environ.get("VSCMD_ARG_TGT_ARCH")
+    if active_arch:
+        # Respect a complete, compatible caller environment, but never compile
+        # an x64 Python extension with an x86/ARM or unsupported newer toolset.
+        version = os.environ.get("VCToolsVersion", "").split(".")
+        supported = (len(version) >= 2 and version[0] == "14"
+                     and version[1].isdigit() and 20 <= int(version[1]) < 50)
+        if active_arch.lower() == "x64" and supported:
+            return
+        raise RuntimeError("Use an x64 Visual Studio 2019/2022 C++ environment, or launch from the desktop")
     vswhere = os.path.join(
         os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
         "Microsoft Visual Studio", "Installer", "vswhere.exe")
@@ -94,16 +112,32 @@ def _add_msvc_to_path() -> None:
     if os.path.exists(vswhere):
         try:
             out = subprocess.run(
-                [vswhere, "-latest", "-products", "*", "-property", "installationPath"],
-                capture_output=True, text=True, timeout=20)
+                [vswhere, "-latest", "-products", "*", "-version", "[16.0,18.0)",
+                 "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                 "-property", "installationPath"],
+                capture_output=True, text=True, timeout=20,
+                creationflags=subprocess.CREATE_NO_WINDOW)
             roots = [p for p in out.stdout.splitlines() if p.strip()]
         except Exception:                        # noqa: BLE001
             roots = []
     for root in roots:
-        hits = sorted(glob.glob(os.path.join(
-            root, "VC", "Tools", "MSVC", "*", "bin", "Hostx64", "x64", "cl.exe")))
-        if hits:
-            os.environ["PATH"] = os.path.dirname(hits[-1]) + os.pathsep + os.environ["PATH"]
+        vcvars = os.path.join(root, "VC", "Auxiliary", "Build", "vcvars64.bat")
+        if os.path.isfile(vcvars):
+            # INCLUDE, LIB and the Windows SDK matter as well as cl.exe.
+            # Capture the environment privately; it may contain user secrets.
+            out = subprocess.run(
+                f'cmd.exe /d /s /c ""{vcvars}" >nul && set"',
+                capture_output=True, text=True, errors="replace", timeout=45,
+                creationflags=subprocess.CREATE_NO_WINDOW)
+            if out.returncode:
+                raise RuntimeError("Could not activate the Visual Studio C++ build tools")
+            for line in out.stdout.splitlines():
+                key, sep, value = line.partition("=")
+                if sep and key:
+                    os.environ[key] = value
+            if os.environ.get("VSCMD_ARG_TGT_ARCH", "").lower() != "x64":
+                raise RuntimeError("Visual Studio did not provide an x64 build environment")
+            os.environ.setdefault("DISTUTILS_USE_SDK", "1")
             return
 
 
@@ -127,11 +161,20 @@ def _available() -> tuple[bool, str]:
         _CACHE["status"] = (False, "CUDA is not available")
         return _CACHE["status"]
     try:
+        # Must precede gsplat: torch.cpp_extension caches CUDA_HOME on import.
+        _ensure_build_env()
+        # Compile for the device used by this engine, not unrelated secondary
+        # GPUs (which can belong to architectures unsupported by this torch).
+        cap = torch.cuda.get_device_capability(torch.cuda.current_device())
+        os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "%d.%d" % cap)
+    except Exception as e:
+        _CACHE["status"] = (False, "GPU build environment is unavailable: %s" % e)
+        return _CACHE["status"]
+    try:
         import gsplat                            # noqa: F401
     except Exception as e:                       # noqa: BLE001
         _CACHE["status"] = (False, "gsplat is missing (%s)" % type(e).__name__)
         return _CACHE["status"]
-    _ensure_build_env()
     # Importing gsplat proves nothing: its CUDA extension loads lazily on the
     # first real call, and that is where a missing toolchain shows up. Force it
     # now with a trivial render so the editor can say so before the user waits.

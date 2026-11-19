@@ -1,35 +1,35 @@
-"""Install everything the deep repair needs, in an order that survives.
+"""Install and exercise the pinned Deep Fill environment.
 
     core/.venv/Scripts/python.exe core/setup_deep.py
 
-Three things here are not obvious, and each one cost an hour the first time:
+The editor and its taskbar shortcut use this same virtual environment.
 
-1. **`simple-lama-inpainting` depends on torch and will happily replace a CUDA
-   build with the CPU one.** Installed with ``--no-deps`` for that reason; its
-   real dependencies go in separately.
-2. **gsplat from PyPI is pure Python and compiles on first use.** That needs
-   MSVC and a CUDA toolkit, and it passes the GCC-only flag ``-Wno-attributes``
-   to MSVC, which rejects it (``error D8021``). Patched below. The compile takes
-   a couple of minutes, once.
-3. **The community Windows wheels are not needed.** They work, but they are a
-   third-party binary; the official package plus that one-line patch gets there
-   without one.
+LaMa's old package pins conflict with current NumPy/Pillow/Torch, so install
+its tested runtime dependencies explicitly. gsplat compiles its official
+source with the existing MSVC tools and an app-local NVIDIA compiler. Any
+failed download, installation, render or model inference fails this script.
 """
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
 
 TORCH = "2.9.1"
+TORCHVISION = "0.24.1"
+GSPLAT = "1.5.3"
+LAMA = "0.1.2"
 CUDA = "cu128"
 INDEX = "https://download.pytorch.org/whl/" + CUDA
+CORE = Path(__file__).resolve().parent
+REPOSITORY = CORE.parent
 
 
 def run(args, **kw):
-    print("   $", " ".join(args[:6]), "…" if len(args) > 6 else "")
-    return subprocess.run(args, check=False, **kw)
+    print("   $", " ".join(args[:6]), "…" if len(args) > 6 else "", flush=True)
+    return subprocess.run(args, check=True, **kw)
 
 
 def pip(*args):
@@ -37,32 +37,42 @@ def pip(*args):
 
 
 def step(n, title):
-    print("\n[%d] %s" % (n, title))
+    print("\n[%d] %s" % (n, title), flush=True)
 
 
 def main():
     print("Python:", sys.version.split()[0], "|", sys.executable)
     if sys.version_info[:2] not in ((3, 10), (3, 11), (3, 12), (3, 13)):
-        print("Warning: gsplat expects Python 3.10-3.13")
+        raise RuntimeError("Deep Fill expects Python 3.10-3.13.")
+    if sys.prefix == sys.base_prefix:
+        raise RuntimeError("Use core/.venv/Scripts/python.exe so setup changes only the editor environment.")
+    os.environ.setdefault("PIP_CACHE_DIR", str(REPOSITORY / ".cache" / "pip"))
+    os.environ.setdefault("TORCH_HOME", str(CORE / "models" / "torch"))
+    if sys.platform == "win32":
+        step(0, "App-local CUDA compiler (no driver or system changes)")
+        from setup_cuda import ensure_cuda
+        compiler = ensure_cuda()
+        os.environ["CUDA_HOME"] = str(compiler)
+        os.environ["PATH"] = str(compiler / "bin") + os.pathsep + os.environ.get("PATH", "")
 
     step(1, "PyTorch with CUDA")
-    pip("install", "--upgrade", "torch==" + TORCH, "torchvision",
+    pip("install", "torch==" + TORCH, "torchvision==" + TORCHVISION,
         "--index-url", INDEX)
 
     step(2, "Build tools for gsplat")
-    pip("install", "--upgrade", "ninja", "packaging", "jaxtyping", "rich",
+    pip("install", "ninja", "packaging", "jaxtyping", "rich",
         "typing_extensions")
 
     step(3, "gsplat (official package, compiles on first run)")
-    pip("install", "--upgrade", "gsplat")
+    pip("install", "gsplat==" + GSPLAT)
 
     step(4, "LaMa, without touching PyTorch")
-    # --no-deps: it pins torch loosely and would pull the CPU build over the
-    # CUDA one we just installed, silently disabling every GPU path.
+    # Install the explicitly selected, tested dependencies instead of LaMa's
+    # obsolete upper bounds. Do not let its resolver replace the CUDA stack.
     print("   (pip may now report dependency conflicts for simple-lama-inpainting.")
     print("    That is expected: it is installed without its pinned versions on purpose.)")
-    pip("install", "--no-deps", "simple-lama-inpainting")
-    pip("install", "--upgrade", "pillow", "opencv-python-headless", "fire")
+    pip("install", "--no-deps", "simple-lama-inpainting==" + LAMA)
+    pip("install", "pillow", "opencv-python-headless==4.13.0.92", "fire==0.5.0")
 
     step(5, "Remove the flag MSVC rejects from gsplat")
     patch_gsplat()
@@ -72,17 +82,17 @@ def main():
 
 
 def patch_gsplat():
-    try:
-        import gsplat
-    except Exception as e:                       # noqa: BLE001
-        print("   cannot import gsplat:", e)
+    if os.name != "nt":
         return
-    path = os.path.join(os.path.dirname(gsplat.__file__), "cuda", "_backend.py")
+    import importlib.util
+    spec = importlib.util.find_spec("gsplat")
+    if spec is None or spec.origin is None:
+        raise RuntimeError("gsplat was not installed.")
+    path = os.path.join(os.path.dirname(spec.origin), "cuda", "_backend.py")
     try:
         src = open(path, encoding="utf-8").read()
     except OSError as e:
-        print("   cannot read _backend.py:", e)
-        return
+        raise RuntimeError("Cannot read gsplat compiler flags") from e
     if "os.name != \"nt\"" in src and "-Wno-attributes" in src:
         print("   already patched")
         return
@@ -95,7 +105,7 @@ def patch_gsplat():
         '            extra_cflags.append("-Wno-attributes")',
         src)
     if new == src:
-        print("   nothing to patch (different gsplat version?)")
+        print("   compiler flags differ; the real GPU render will verify compatibility")
         return
     open(path, "w", encoding="utf-8").write(new)
     print("   patched:", path)
@@ -103,34 +113,32 @@ def patch_gsplat():
 
 def verify():
     code = r'''
-import sys
-ok = True
-try:
-    import torch
-    print("torch", torch.__version__, "cuda", torch.version.cuda,
-          "available", torch.cuda.is_available())
-    ok &= torch.cuda.is_available()
-except Exception as e:
-    print("torch MISSING:", e); ok = False
-try:
-    sys.path.insert(0, ".")
-    from splatcore import gpu
-    good, why = gpu.available()
-    print("gsplat:", good, "-", why)
-    ok &= good
-except Exception as e:
-    print("gsplat ERROR:", e); ok = False
-try:
-    from splatcore.deep import load_inpainter
-    _, name = load_inpainter("auto")
-    print("Inpainter:", name)
-except Exception as e:
-    print("Inpainter MISSING:", e); ok = False
-print("\nDeep Fill is ready" if ok else "\nSetup is not complete yet")
+import numpy as np
+from splatcore import gpu
+good, why = gpu.available()
+print("gsplat:", good, "-", why, flush=True)
+if not good:
+    raise RuntimeError("GPU render failed: " + why)
+from splatcore.deep import load_inpainter
+fill, name = load_inpainter("lama")
+y, x = np.indices((128, 128))
+image = np.stack([x * 2, y * 2, (x + y)], axis=-1).astype(np.uint8)
+mask = np.zeros((128, 128), np.uint8)
+mask[48:80, 48:80] = 255
+damaged = image.copy()
+damaged[mask != 0] = 0
+result = fill(damaged, mask)
+if result.shape != image.shape or result.dtype != np.uint8 or not np.any(result[mask != 0]):
+    raise RuntimeError("LaMa did not produce the expected filled image.")
+print("LaMa inference passed:", result.shape, result.dtype, flush=True)
+print("\nDeep Fill is ready", flush=True)
 '''
-    here = os.path.dirname(os.path.abspath(__file__))
-    run([sys.executable, "-c", code], cwd=here)
+    run([sys.executable, "-c", code], cwd=CORE)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
+        print(f"\nDeep Fill setup failed: {error}", file=sys.stderr)
+        raise SystemExit(1)
