@@ -10,6 +10,7 @@
 import { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } from 'electron';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
+import { OpenFolderPreference } from './open-folder.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Sidecar } from './sidecar.js';
 import { mirrorFolderOf, removeMirrorFolder } from './mirror.js';
@@ -30,6 +31,8 @@ const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 
 let win: BrowserWindow | null = null;
 const engine = new Sidecar(CORE);
+
+const openFolder = new OpenFolderPreference(() => path.join(app.getPath('userData'), 'open-folder.json'));
 
 /**
  * Send to the page, if there still is one. The engine's log and exit arrive
@@ -313,6 +316,7 @@ ipcMain.handle('engine:call', async (_e, cmd: string, args: Record<string, any>,
     const reply = await engine.call(cmd, args,
       payload ? new Uint8Array(payload) : undefined);
     if (cmd === 'open' && reply.header.ok) {
+      if (typeof args.path === 'string') await openFolder.remember(args.path);
       // The file the user opened, and the PLY the engine wrote of it for the
       // viewport, become readable through app://local/_file/. Decided here,
       // from the engine's own answer: the page used to name the paths itself.
@@ -336,6 +340,7 @@ ipcMain.handle('engine:call', async (_e, cmd: string, args: Record<string, any>,
 ipcMain.handle('dialog:openSplat', async () => {
   const r = await dialog.showOpenDialog(win!, {
     title: 'Open Splat',
+    defaultPath: await openFolder.get(),
     properties: ['openFile'],
     filters: [
       { name: 'Gaussian Splats', extensions: ['ply', 'splat', 'spz'] },
