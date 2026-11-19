@@ -34,6 +34,52 @@ I built this in eight days and filmed it:
 
 On a selection you can delete, fill or export.
 
+In the Selection panel, **Selection display → Bright highlight** makes selected
+splats yellow and boosts their displayed opacity. **X-ray markers** also draws
+solid yellow squares at selected centres, including behind surfaces. These are
+view-only aids: exported colour, opacity, geometry, and selection membership
+are unchanged. Deleted/cropped splats are excluded. For large selections the
+marker overlay samples up to 20,000 centres; the panel reports this limit.
+Choose **Normal** to return to the usual blue tint.
+
+**Clean Up → Surface haze** is an experimental CPU detector for faint splats
+displaced from nearby opaque, locally flat surfaces. Choose **Current selection**
+to analyse a brushed region (using the rest of the model as surface reference),
+or **Whole model**, then **Select surface haze**. Higher thresholds select fewer
+candidates. Results replace the selection and enable X-ray markers; inspect
+several views before deleting. Undo restores the previous selection if you want
+to rerun a region with a different threshold.
+
+This does not sharpen textures or retrain the scan. It deliberately skips rough
+or ambiguous neighbourhoods, and can miss blur whose splat centres lie on the
+surface. Legitimate translucent detail may resemble haze. It complements the
+detached-floater detector; it does not guarantee automatic noise removal.
+
+For underside cleanup, choose **Brush → Through** in the top options bar
+(**Alt+Z** toggles Surface/Through). Paint from a side view to select splat
+centres inside the screen-space stroke at every depth, including behind the
+model. No surface hit is required, and Depth is disabled. Shift adds and Ctrl
+subtracts. Review with X-ray markers before deleting. Surface retains the
+original depth-limited 3D brush. Through selection uses projected centres,
+not the full translucent footprint of each splat.
+
+### Navigation and orientation
+
+Choose **View → Mouse Like Metashape** for left-drag to pan (in the Orbit
+tool), middle-drag to orbit, and right-drag or the wheel to zoom. Editing
+tools retain left-drag for painting and selection. Metashape is the default
+for new preferences; existing Blender/SuperSplat preferences are retained.
+
+DJI Terra PLY exports with an unrotated `LOCAL_ENU_CS` `geo_desc.json`
+beside the file or up to two folders above it open with **+Z up**. This
+changes the camera frame, not the stored coordinates. Unknown or rotated
+coordinate systems retain the existing default; orientation is not guessed
+from scene geometry. Keep the Terra sidecar with its Block/LOD folders.
+
+Press **U** (or click the Up button) to choose and remember an axis for a
+file. **Shift+U** (or Shift-click) clears that override and reapplies automatic
+orientation. The Up button tooltip identifies the detected orientation.
+
 - **Fast Fill** is geometric. It fits the surface around the hole and copies
   whole splats from nearby, so scale, rotation and spherical harmonics stay
   consistent. It runs on the CPU in about 0.3 to 1.5 s on a scan with 550,000
