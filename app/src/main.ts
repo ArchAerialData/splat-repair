@@ -541,6 +541,9 @@ async function openFile(path: string) {
     clearSelection();
     // Upright before the first frame is shown: the axis this file was last
     // viewed with, else the 3DGS convention.
+    const orientation = open.header.orientation;
+    detectedUpAxis = UP_AXES.includes(orientation?.up) ? orientation.up : DEFAULT_UP;
+    detectedUpSource = orientation?.source ?? 'default (orientation unknown)';
     applyUpAxis(savedUpAxis(path), false);
     if (viewer.splat && viewer.editState) {
       // What the GPU brush needs to see a splat's size. Written once: the
@@ -577,7 +580,8 @@ async function openFile(path: string) {
     // again and the search for debris refuses the file while they are there.
     const bad = Number(open.header.nonFinite ?? 0);
     status(`loaded in ${num((performance.now() - t0) / 1000)} s · `
-           + `${sourceFormat} · SH ${info.shBands}`
+           + `${sourceFormat} · SH ${info.shBands} · Up ${UP_LABEL[viewer.upAxis]}`
+           + (viewer.upAxis === detectedUpAxis ? ` (${detectedUpSource})` : ' (saved override)')
            + (sourceFormat === 'splat' ? ' · .splat carries no SH bands' : '')
            + (bad ? ` · ${fmt(bad)} ${bad === 1 ? 'splat' : 'splats'} without a valid position`
                     + ' · remove them in the Filter menu' : ''),
@@ -607,12 +611,15 @@ const UP_KEY = 'splatRepair.up:';
 const UP_LABEL: Record<UpAxis, string> = { '-y': '−Y', '+y': '+Y', '+z': '+Z', '-z': '−Z' };
 
 /** The up axis this file was last viewed with, or the 3DGS default. */
+let detectedUpAxis: UpAxis = DEFAULT_UP;
+let detectedUpSource = 'default (orientation unknown)';
+
 function savedUpAxis(path: string): UpAxis {
   try {
     const v = localStorage.getItem(UP_KEY + path) as UpAxis | null;
     if (v && UP_AXES.includes(v)) return v;
   } catch { /* storage unavailable: fall through */ }
-  return DEFAULT_UP;
+  return detectedUpAxis;
 }
 
 /** Turn the view to an up axis; `remember` stores it for this file. */
@@ -620,6 +627,7 @@ function applyUpAxis(up: UpAxis, remember = true) {
   viewer.setUpAxis(up);
   projDirty = true;
   $('btn-up').textContent = `Up ${UP_LABEL[up]}`;
+  $('btn-up').title = `Up ${UP_LABEL[up]}. Click / U: change axis. Shift+click / Shift+U: automatic (${UP_LABEL[detectedUpAxis]}, ${detectedUpSource}).`;
   if (remember && filePath) {
     try { localStorage.setItem(UP_KEY + filePath, up); } catch { /* not persistent */ }
   }
@@ -635,8 +643,14 @@ function applyUpAxis(up: UpAxis, remember = true) {
   showCloneSource();
 }
 
-function cycleUpAxis() {
+function cycleUpAxis(event?: MouseEvent) {
   if (!doc.nTotal) return;
+  if (event?.shiftKey) {
+    try { localStorage.removeItem(UP_KEY + filePath); } catch { /* unavailable */ }
+    applyUpAxis(detectedUpAxis, false);
+    status(`Up ${UP_LABEL[detectedUpAxis]} · ${detectedUpSource}`, 'ok');
+    return;
+  }
   const i = UP_AXES.indexOf(viewer.upAxis);
   applyUpAxis(UP_AXES[(i + 1) % UP_AXES.length]);
   status(`up is now ${UP_LABEL[viewer.upAxis]} · remembered for this file`, 'ok');
@@ -2424,6 +2438,9 @@ const TOOL_HINT: Record<Tool, string> = {
 
 /** The tool's hint; lasso and box say when they take the back too. */
 function toolHint(t: Tool): string {
+  if (t === 'orbit' && viewer.preset === 'metashape') {
+    return 'Left-drag pans · middle-drag orbits · right-drag / wheel zooms. Double-click centres.';
+  }
   if ((t === 'lasso' || t === 'box') && selDepth === 'through') {
     return 'Through: you select everything inside the outline, the back too. Alt+Z switches back.';
   }

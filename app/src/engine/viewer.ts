@@ -8,7 +8,7 @@
  * about splats by index, so both sides must agree on what index 12345 means.
  * We keep file order and accept slightly worse locality.
  *
- * The stage is neutral black, not the warm panel colour. Judging a repair means
+ * The stage is neutral black, not the panel colour. Judging a repair means
  * judging colour, and a tinted background biases that.
  */
 import * as pc from 'playcanvas';
@@ -33,7 +33,7 @@ export interface SplatInfo {
  *   button turns too, which is what this app always did.
  * - supersplat: right pans, middle zooms. Left turns in "Orbit" in both.
  */
-export type NavPreset = 'blender' | 'supersplat';
+export type NavPreset = 'blender' | 'supersplat' | 'metashape';
 type Gesture = 'orbit' | 'pan' | 'zoom' | 'look';
 
 /** A camera pose in the up frame. Angles in degrees. */
@@ -237,7 +237,7 @@ export class Viewer {
   navData: NavData | null = null;
   /** The active tool leaves the left button free ("Orbit"). */
   leftNavigates = false;
-  preset: NavPreset = 'blender';
+  preset: NavPreset = 'metashape';
   /** Fly speed multiplier; the wheel changes it while flying. */
   flySpeed = 1;
   /** Short messages for the user (fly speed, view names). */
@@ -1009,6 +1009,12 @@ void modifySplatColor(vec3 center, inout vec4 color) { color.rgb = vec3(1.0, 0.0
       if (b === 1) return 'pan';
       if (b === 2) return 'zoom';
     }
+    if (this.preset === 'metashape') {
+      if (b === 0) return this.leftNavigates ? 'pan' : null;
+      if (b === 1) return 'orbit';
+      if (b === 2) return 'zoom';
+      return null;
+    }
     if (b === 0) return this.leftNavigates ? mod('orbit') : null;
     if (this.preset === 'supersplat') {
       if (b === 2) return 'pan';
@@ -1057,7 +1063,9 @@ void modifySplatColor(vec3 center, inout vec4 color) { color.rgb = vec3(1.0, 0.0
         if (this.dragging === 'orbit') this.leaveAutoOrtho();
       }
       if (this.dragging === 'orbit') {
-        this.turn(dx, dy, this.drag.pivot);
+        // Metashape middle-drag: down raises the camera, up lowers it.
+        const orbitDy = this.preset === 'metashape' && this.drag.button === 1 ? -dy : dy;
+        this.turn(dx, orbitDy, this.drag.pivot);
       } else if (this.dragging === 'look') {
         // fly: look around from where the camera is
         this.turn(dx, -dy, this.camera.getPosition().clone(), 0.18);

@@ -37,6 +37,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from splatcore.document import Document           # noqa: E402
+from splatcore.orientation import detect_orientation
 from splatcore.io import save_ply                 # noqa: E402
 from splatcore.repair import RepairParams, RepairError  # noqa: E402
 
@@ -141,6 +142,7 @@ class Session:
             "path": os.path.abspath(path),
             "format": d.source_format,
             "viewPath": view_path,
+            "orientation": detect_orientation(path) if d.source_format == 'ply' else None,
         }
         self.doc = d
         return reply, b""

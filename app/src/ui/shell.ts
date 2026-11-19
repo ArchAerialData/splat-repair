@@ -84,6 +84,12 @@ function navRows(p: NavPreset): Array<[string, string]> {
     ['Fly faster / speed', 'Shift · wheel while flying'],
     ['Like Maya and Houdini', 'Alt + left, middle, right'],
   ];
+  if (p === 'metashape') return [
+    ['Pan', 'Drag left in Orbit'],
+    ['Orbit', 'Drag middle'],
+    ['Zoom by dragging', 'Drag right'],
+    ...common
+  ];
   if (p === 'supersplat') {
     return [
       ['Orbit around the point under the pointer', 'Drag left in Orbit · Alt+left'],
@@ -102,6 +108,8 @@ function navRows(p: NavPreset): Array<[string, string]> {
 }
 
 function navHint(p: NavPreset, tool: string): string {
+  if (p === 'metashape') return (tool === 'orbit' ? 'Left: pan · ' : '')
+    + 'Middle: orbit · right/wheel: zoom · F1: all keys';
   if (tool === 'orbit') {
     return p === 'supersplat'
       ? 'Left: orbit · right: pan · wheel: zoom · Home: default view · F1: all keys'
@@ -132,7 +140,7 @@ export class Shell {
     const v = api.viewer;
     try {
       const p = localStorage.getItem(PRESET_KEY) as NavPreset | null;
-      if (p === 'blender' || p === 'supersplat') v.preset = p;
+      if (p === 'blender' || p === 'supersplat' || p === 'metashape') v.preset = p;
     } catch { /* not persistent */ }
     let beta = false;
     try { beta = localStorage.getItem(BETA_KEY) === '1'; } catch { /* not persistent: off */ }
@@ -237,8 +245,11 @@ export class Shell {
         { label: 'Orthographic', keys: 'Num 5', bind: ['Numpad5', 'Digit5'], enabled: doc,
           checked: () => v.isOrtho, run: () => this.toggleOrtho() },
         '-',
+        { label: 'Use Automatic Up Axis', keys: 'Shift+U', bind: ['shift+u'],
+          run: () => $('btn-up').dispatchEvent(new MouseEvent('click', { shiftKey: true })), enabled: live('btn-up') },
         { label: 'Switch Up Axis', keys: 'U', bind: ['u'], run: click('btn-up'), enabled: live('btn-up') },
         '-',
+        preset('metashape', 'Mouse Like Metashape'),
         preset('blender', 'Mouse Like Blender'),
         preset('supersplat', 'Mouse Like SuperSplat'),
         { note: 'Fly: hold the right mouse button, then W A S D, Q and E. The wheel changes the speed.' },
@@ -523,6 +534,7 @@ export class Shell {
     $('opt-selmode').hidden = t === 'clone';
     $('brush-depth-field').hidden = t === 'clone';
     $('nav-hint').textContent = navHint(this.api.viewer.preset, t);
+    if (t === 'orbit') $('tool-hint').textContent = navHint(this.api.viewer.preset, t);
   }
 
   /* ------------------------------------------------------------- panels */
@@ -632,7 +644,7 @@ export class Shell {
     this.api.viewer.preset = p;
     try { localStorage.setItem(PRESET_KEY, p); } catch { /* not persistent */ }
     this.onTool(this.api.tool());
-    this.toast(p === 'blender' ? 'Mouse like Blender' : 'Mouse like SuperSplat');
+    this.toast(`Mouse like ${p === 'metashape' ? 'Metashape' : p === 'blender' ? 'Blender' : 'SuperSplat'}`);
     if (!$('help').hidden) this.showHelp(true);
   }
 
@@ -797,7 +809,7 @@ export class Shell {
       body.appendChild(s);
     };
     const p = this.api.viewer.preset;
-    section(p === 'blender' ? 'Mouse (like Blender)' : 'Mouse (like SuperSplat)', navRows(p));
+    section(`Mouse (${p})`, navRows(p));
     for (const m of this.menus) {
       const rows: Array<[string, string]> = [];
       for (const it of m.items()) {
