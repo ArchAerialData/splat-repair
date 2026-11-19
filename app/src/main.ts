@@ -460,7 +460,7 @@ function closeDocument() {
   setHistory({ canUndo: false, canRedo: false });
   $('file-name').textContent = 'No file open';
   hint.hidden = false;
-  for (const id of ['btn-export', 'btn-floaters', 'btn-invert', 'btn-up']) {
+  for (const id of ['btn-export', 'btn-floaters', 'btn-surface-noise', 'btn-invert', 'btn-up']) {
     $<HTMLButtonElement>(id).disabled = true;
   }
   projDirty = true;
@@ -560,6 +560,7 @@ async function openFile(path: string) {
     hint.hidden = true;
     $<HTMLButtonElement>('btn-export').disabled = false;
     $<HTMLButtonElement>('btn-floaters').disabled = false;
+    $<HTMLButtonElement>('btn-surface-noise').disabled = false;
     $<HTMLButtonElement>('btn-invert').disabled = false;
     $<HTMLButtonElement>('btn-up').disabled = false;
     // A fresh document has an empty history; the buttons used to stay lit
@@ -2447,6 +2448,26 @@ async function doDropInvalid() {
   }
 }
 
+async function doSurfaceNoise() {
+  if (engineBusy || !doc.nTotal) return;
+  const selectionOnly = $<HTMLSelectElement>('surface-noise-scope').value === 'selection';
+  if (selectionOnly && !selCount) { status('Select a region first, or choose Whole model.', 'err'); return; }
+  setBusy(true, 'Finding surface haze …');
+  try {
+    const r = await engine('surface_noise', {
+      threshold: Number($<HTMLInputElement>('surface-noise-thr').value), selectionOnly
+    }, selectionOnly ? selectionPayload() : undefined);
+    history.labelNext('Select surface haze');
+    selectMode = 'replace';
+    forgetStroke(); selView = null; setVolume(null);
+    commitHits(Uint32Array.from(r.header.indices as number[]));
+    $<HTMLSelectElement>('selection-display').value = 'xray';
+    $('selection-display').dispatchEvent(new Event('change'));
+    status(`${fmt(selCount)} surface haze candidates selected · ${r.header.seconds} s · review before deleting`, 'ok');
+  } catch (e: any) { status(String(e.message ?? e), 'err'); }
+  finally { setBusy(false); }
+}
+
 /** Ask the engine which splats look like debris, and select them. */
 async function doFloaters() {
   if (engineBusy) return;
@@ -2904,6 +2925,8 @@ $('btn-reroll').addEventListener('click', async () => {
                    objects: last.objects });
 });
 $('btn-floaters').addEventListener('click', doFloaters);
+$('btn-surface-noise').addEventListener('click', doSurfaceNoise);
+bindRange('surface-noise-thr', 'surface-noise-value', 2);
 $('btn-crop').addEventListener('click', doCrop);
 $('btn-crop-reset').addEventListener('click', resetCrop);
 $('btn-invert').addEventListener('click', invertSelection);

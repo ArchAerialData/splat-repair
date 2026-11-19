@@ -482,6 +482,36 @@ class Session:
         return {"mode": r["mode"], "indices": _u32(r["indices"]), "object": _u32(r["object"]),
                 "info": _jsonable(r["info"]), "seconds": round(time.time() - t, 3)}, b""
 
+    def cmd_surface_noise(self, h, p):
+        from splatcore.surface_noise import analyse
+        from types import SimpleNamespace
+        d = self._doc()
+        t = time.time()
+        threshold = float(h.get('threshold', .35))
+        if not math.isfinite(threshold) or not .05 <= threshold <= .95:
+            raise ValueError('Surface haze threshold must be between 0.05 and 0.95.')
+        candidates = None
+        if h.get('selectionOnly'):
+            if len(p) % 4:
+                raise ValueError('Surface haze selection payload is not a list of splat indices.')
+            requested = np.frombuffer(p, dtype='<u4').astype(np.int64)
+            if not len(requested):
+                raise ValueError('Select a region first, or choose Whole model.')
+            candidates = requested[requested < d.n_total]
+            candidates = candidates[d.alive[candidates]]
+            if not len(candidates):
+                raise ValueError('The selection contains no live splats.')
+        # Do not call live_splats(): that copies every attribute (including
+        # potentially gigabytes of SH coefficients) for an analysis needing
+        # only these three arrays. Base-only documents need no geometry copy.
+        arrays = {name: (np.concatenate([getattr(d.base, name), getattr(d.generated, name)])
+                         if d.generated.n else getattr(d.base, name))
+                  for name in ('xyz', 'opacity', 'scale')}
+        ids, scores, info = analyse(SimpleNamespace(**arrays), candidates, alive=d.alive)
+        selected = ids[scores >= threshold]
+        return {'indices': _u32(selected), 'count': len(selected),
+                'seconds': round(time.time() - t, 2), **info}, b''
+
     def cmd_floaters(self, h, p):
         """Debris above a threshold, as document indices.
 

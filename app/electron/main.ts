@@ -270,7 +270,7 @@ const PAGE_COMMANDS = new Set([
   'ping', 'capabilities', 'open', 'save',
   'repair', 'deep_repair', 'refine', 'unshadow', 'solidify',
   'delete', 'drop_nonfinite', 'transform', 'clone',
-  'object_select', 'floaters', 'undo', 'redo'
+  'object_select', 'floaters', 'surface_noise', 'undo', 'redo'
 ]);
 /** In the autotest also the engine's own counts, for a check to read. */
 const AUTOTEST_COMMANDS = new Set(['stats']);

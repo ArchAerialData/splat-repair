@@ -279,6 +279,21 @@
         then look, then delete.</p>
 
       <div class="field field--gap">
+        <label for="surface-noise-thr">Surface haze <span class="num" id="surface-noise-value">0.35</span></label>
+        <input type="range" id="surface-noise-thr" min="0.05" max="0.95" step="0.05" value="0.35"
+          title="Higher thresholds select fewer, stronger candidates.">
+        <label for="surface-noise-scope">Search area</label>
+        <select id="surface-noise-scope">
+          <option value="selection">Current selection</option>
+          <option value="all">Whole model</option>
+        </select>
+      </div>
+      <button class="btn btn--soft" id="btn-surface-noise" disabled>Select surface haze</button>
+      <p class="hintline quiet">Experimental: faint splats displaced from nearby solid surfaces.
+        Lower thresholds select more. Review from several angles before deleting;
+        fine structures and vegetation can resemble noise. Runs on CPU.</p>
+
+      <div class="field field--gap">
         <label>Crop Box <span class="num" id="crop-count">off</span></label>
         <div class="crop">
           <span class="crop__ax" id="crop-ax-x">X</span>
