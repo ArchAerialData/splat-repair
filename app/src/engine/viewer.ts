@@ -105,6 +105,7 @@ const MODIFY_WGSL = `
 uniform uXfQuat: vec4f;      // (x, y, z, w)
 uniform uXfTrans: vec3f;
 uniform uXfPivot: vec3f;
+uniform uInspectSelection: f32;
 uniform uXfScale: f32;
 
 fn xfRot(q: vec4f, v: vec3f) -> vec3f {
@@ -141,7 +142,11 @@ fn modifySplatColor(center: vec3f, color: ptr<function, vec4f>) {
     if (loadEditDel().r != 0u) {
         *color = vec4f((*color).rgb, 0.0);
     } else if (loadEditSel().r != 0u) {
-        *color = vec4f(mix((*color).rgb, vec3f(0.376, 0.647, 0.980), 0.6), (*color).a);
+        if (uniform.uInspectSelection > 0.5) {
+            *color = vec4f(1.0, 0.88, 0.29, max((*color).a, 0.85));
+        } else {
+            *color = vec4f(mix((*color).rgb, vec3f(0.376, 0.647, 0.980), 0.6), (*color).a);
+        }
     }
 }
 `;
@@ -150,6 +155,7 @@ const MODIFY_GLSL = `
 uniform vec4 uXfQuat;
 uniform vec3 uXfTrans;
 uniform vec3 uXfPivot;
+uniform float uInspectSelection;
 uniform float uXfScale;
 
 vec3 xfRot(vec4 q, vec3 v) {
@@ -185,7 +191,11 @@ void modifySplatColor(vec3 center, inout vec4 color) {
     if (loadEditDel().r != 0u) {
         color.a = 0.0;
     } else if (loadEditSel().r != 0u) {
-        color.rgb = mix(color.rgb, vec3(0.376, 0.647, 0.980), 0.6);
+        if (uInspectSelection > 0.5) {
+            color = vec4(1.0, 0.88, 0.29, max(color.a, 0.85));
+        } else {
+            color.rgb = mix(color.rgb, vec3(0.376, 0.647, 0.980), 0.6);
+        }
     }
 }
 `;
@@ -238,6 +248,21 @@ export class Viewer {
   /** The active tool leaves the left button free ("Orbit"). */
   leftNavigates = false;
   preset: NavPreset = 'metashape';
+  private inspectSelection = false;
+  private inspectionTransform = new pc.Mat4();
+
+  setSelectionInspection(on: boolean) {
+    this.inspectSelection = on;
+    for (const e of [this.splat, this.generated]) {
+      (e as any)?.gsplat?.setParameter('uInspectSelection', on ? 1 : 0);
+    }
+  }
+
+  inspectionProjection(): Float32Array {
+    const vp = new pc.Mat4();
+    vp.data.set(this.viewProjection());
+    return new pc.Mat4().mul2(vp, this.inspectionTransform).data as Float32Array;
+  }
   /** Fly speed multiplier; the wheel changes it while flying. */
   flySpeed = 1;
   /** Short messages for the user (fly speed, view names). */
@@ -525,6 +550,7 @@ export class Viewer {
       (entity.gsplat as any).setWorkBufferModifier({
         wgsl: MODIFY_WGSL, glsl: MODIFY_GLSL
       });
+      (entity.gsplat as any).setParameter('uInspectSelection', this.inspectSelection ? 1 : 0);
       return true;
     } catch (e) {
       console.warn('editState stream unavailable:', e);
@@ -542,6 +568,10 @@ export class Viewer {
   setTransformPreview(quat: [number, number, number, number],
                       trans: [number, number, number],
                       pivot: [number, number, number], scale: number) {
+    const q = new pc.Quat(...quat);
+    const offset = q.transformVector(new pc.Vec3(...pivot).mulScalar(scale));
+    const t = new pc.Vec3(...pivot).add(new pc.Vec3(...trans)).sub(offset);
+    this.inspectionTransform.setTRS(t, q, new pc.Vec3(scale, scale, scale));
     for (const e of [this.splat, this.generated]) {
       const g = (e as any)?.gsplat;
       if (!g) continue;

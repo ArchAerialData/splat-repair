@@ -1,3 +1,4 @@
+import { selectionMarkers, MARKER_LIMIT } from './ui/selection-inspection';
 /**
  * Splat Repair -- application glue.
  *
@@ -1113,6 +1114,49 @@ function clearSelection() {
   history.noteSelection('Deselect');
 }
 
+let inspectionMode = 'normal';
+let inspectionDirty = true;
+let inspectionProjection = new Float32Array(16);
+const inspectionCanvas = $<HTMLCanvasElement>('selection-inspection');
+$('selection-display').addEventListener('change', () => {
+  inspectionMode = $<HTMLSelectElement>('selection-display').value;
+  inspectionDirty = true;
+  viewer.setSelectionInspection(inspectionMode !== 'normal');
+  drawInspection();
+});
+
+function drawInspection() {
+  inspectionCanvas.hidden = inspectionMode !== 'xray';
+  const note = $('selection-display-note');
+  note.hidden = inspectionMode === 'normal';
+  const message = inspectionMode === 'bright'
+    ? 'Yellow highlight boosts visibility. Hidden splats may still be obscured. Display only.'
+    : `Yellow markers show selected centres through surfaces. Display only.${selCount > MARKER_LIMIT ? ' Large selection: markers sampled to 20,000; all splats remain selected.' : ''}`;
+  if (note.textContent !== message) note.textContent = message;
+  if (inspectionMode !== 'xray') return;
+  const r = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio, 2);
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (inspectionCanvas.width !== w) { inspectionCanvas.width = w; inspectionDirty = true; }
+  if (inspectionCanvas.height !== h) { inspectionCanvas.height = h; inspectionDirty = true; }
+  const matrix = viewer.inspectionProjection();
+  if (!inspectionDirty && matrix.every((v, i) => v === inspectionProjection[i])) return;
+  inspectionProjection.set(matrix);
+  inspectionDirty = false;
+  const ctx = inspectionCanvas.getContext('2d')!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, r.width, r.height);
+  if (!selCount || !viewer.splat) return;
+  const points = selectionMarkers(doc.centres, selectionIndices(), visibleMask(),
+    matrix, r.width, r.height);
+  ctx.beginPath();
+  for (let i = 0; i < points.length; i += 2) {
+    ctx.rect(points[i] - 2, points[i + 1] - 2, 4, 4);
+  }
+  ctx.strokeStyle = '#050505'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#ffe14a'; ctx.fill();
+}
+
 /* ------------------------------------------------------------------ guides */
 
 /**
@@ -1704,6 +1748,7 @@ async function doExport() {
 
 /** Push the current deleted/selected flags to the GPU. Microseconds, no upload. */
 function applyStates() {
+  inspectionDirty = true;
   if (!viewer.splat) return;
   // While a stroke is live the GPU owns editSel; writing it here would
   // overwrite the preview with a frame-old CPU result.
@@ -2977,6 +3022,7 @@ shell.onTool(tool);
     volumeOutline = new VolumeOutline(canvas, guides, () => (doc.nTotal ? viewer.navData : null));
     volumeOutline.set(selVolume);
     viewer.addFrameListener(() => volumeOutline?.frame(viewer.viewProjection()));
+    viewer.addFrameListener(drawInspection);
     const r = await engine('ping');
     // The engine has answered: "ready" from here on, not from the first
     // paint (the markup says "starting …"). Not over a file's load report.

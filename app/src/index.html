@@ -107,6 +107,7 @@
   <div id="viewport">
     <canvas id="canvas"></canvas>
     <canvas id="guides"></canvas>
+    <canvas id="selection-inspection" aria-hidden="true"></canvas>
     <div id="brush-ring"></div>
     <div id="clone-src"></div>
 
@@ -149,6 +150,13 @@
         <button class="btn btn--ghost btn--sm" id="btn-invert" disabled title="Invert selection (Ctrl+Shift+I)">Invert</button>
         <button class="btn btn--ghost btn--sm" id="btn-frame-sel" disabled title="Frame the selection (F)">Frame</button>
       </div>
+      <label for="selection-display">Selection display</label>
+      <select id="selection-display">
+        <option value="normal">Normal</option>
+        <option value="bright">Bright highlight</option>
+        <option value="xray">X-ray markers</option>
+      </select>
+      <p class="help" id="selection-display-note" hidden></p>
     </section>
 
     <section class="tile" id="repair-tile">
