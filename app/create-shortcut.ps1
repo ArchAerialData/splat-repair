@@ -1,22 +1,16 @@
-# Puts a "Splat Repair" shortcut on the desktop.
-# To undo it, delete the shortcut. Nothing else is installed and nothing
-# is written to the registry.
+# Build branded Desktop and Start Menu shortcuts suitable for pinning.
+# No administrator rights or registry modifications are required.
 $ErrorActionPreference = 'Stop'
-
-$app = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$target = Join-Path $app 'start.cmd'
-$icon = Join-Path $app 'assets\icon.ico'
-foreach ($p in @($target, $icon)) {
-  if (-not (Test-Path $p)) { throw "missing: $p" }
-}
-
-$link = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Splat Repair.lnk'
-$s = (New-Object -ComObject WScript.Shell).CreateShortcut($link)
-$s.TargetPath = $target
-$s.WorkingDirectory = $app
-$s.IconLocation = "$icon,0"
-$s.Description = 'Repair, clean up and export Gaussian splats'
-$s.WindowStyle = 7          # minimized: start.cmd hands over to Electron right away
-$s.Save()
-
-Write-Host "Shortcut created on the desktop: $link"
+$appDirectory = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$runtime = Join-Path $appDirectory 'node_modules\electron\dist\electron.exe'
+if (-not (Test-Path -LiteralPath $runtime)) { throw 'Run install.cmd first.' }
+Push-Location $appDirectory
+try {
+    & npm.cmd run build
+    if ($LASTEXITCODE -ne 0) { throw 'Build failed; shortcuts were not changed.' }
+    $scriptPath = Join-Path $appDirectory 'create-shortcut.cjs'
+    $programsPath = [Environment]::GetFolderPath('Programs')
+    $installer = Start-Process -FilePath $runtime -ArgumentList @("`"$scriptPath`"", '--programs', "`"$programsPath`"") -WindowStyle Hidden -Wait -PassThru
+    if ($installer.ExitCode -ne 0) { throw 'Shortcut creation failed.' }
+} finally { Pop-Location }
+Write-Host 'Right-click Splat Repair in Start or the running taskbar icon and choose Pin to taskbar.'

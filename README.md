@@ -122,7 +122,7 @@ install.cmd
 3. Start the app with `app\start.cmd`.
 
 Everything is installed inside the `splat-repair` folder. To remove Splat
-Repair, delete the folder.
+Repair, delete the folder and any shortcuts or taskbar pins you created.
 
 For Deep Fill (PyTorch, gsplat and LaMa), run the installer with `deep`. You
 can do that at any time:
@@ -138,11 +138,22 @@ ready" when everything works.
 Without Git you can also download the ZIP from the green Code button on
 GitHub, unpack it and run `install.cmd` in the unpacked folder.
 
-`app\create-shortcut.ps1` puts a shortcut on the desktop:
+`app\create-shortcut.ps1` builds the app and creates branded **Splat Repair**
+shortcuts on the desktop and in the Start menu:
 
 ```bash
 powershell -ExecutionPolicy Bypass -File app\create-shortcut.ps1
 ```
+
+Right-click **Splat Repair** in Start (under **More**, if shown), or its running
+taskbar icon, and choose **Pin to taskbar**. The pin can launch the app again
+after you close it. If you have an older generic Electron or terminal pin,
+unpin it first and pin the new shortcut.
+
+Shortcuts launch the latest built app directly. After changing source code,
+run `app\start.cmd` once to rebuild as needed, or run `npm run build` in `app`.
+If you move the repository, rerun the shortcut script and recreate the taskbar
+pin. See [Windows launcher details](docs/windows-launcher.md).
 
 ## Update
 

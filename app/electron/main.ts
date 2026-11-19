@@ -14,6 +14,7 @@ import { OpenFolderPreference } from './open-folder.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Sidecar } from './sidecar.js';
 import { mirrorFolderOf, removeMirrorFolder } from './mirror.js';
+import windowsIdentity from '../windows-identity.json';
 
 // The renderer is served over http in dev and file:// in production, and
 // neither origin may fetch an arbitrary file:// path. A privileged scheme gives
@@ -28,6 +29,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
 const CORE = path.join(ROOT, '..', 'core');
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
+
+// Match the shortcut so taskbar relaunch includes the app, not just Electron.
+if (process.platform === 'win32') app.setAppUserModelId(windowsIdentity.appId);
 
 let win: BrowserWindow | null = null;
 const engine = new Sidecar(CORE);
@@ -111,6 +115,15 @@ function createWindow() {
   // the camera's modifier -- and its accelerators (Ctrl+R reloads the page,
   // losing the document) sat under the app's own shortcuts.
   win.removeMenu();
+  if (process.platform === 'win32') {
+    win.setAppDetails({
+      appId: windowsIdentity.appId,
+      appIconPath: path.join(ROOT, 'assets', 'icon.ico'),
+      appIconIndex: 0,
+      relaunchCommand: `"${process.execPath}" "${ROOT}"`,
+      relaunchDisplayName: windowsIdentity.displayName
+    });
+  }
   win.webContents.on('before-input-event', (e, input) => {
     if (input.type === 'keyDown' && input.key === 'F12') {
       win?.webContents.toggleDevTools();
