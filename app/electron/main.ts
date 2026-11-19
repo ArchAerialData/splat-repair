@@ -86,7 +86,7 @@ function createWindow() {
     height: 980,
     minWidth: 900,
     minHeight: 600,
-    backgroundColor: '#100c0a',
+    backgroundColor: '#171a1d',
     show: false,
     autoHideMenuBar: true,
     title: 'Splat Repair',

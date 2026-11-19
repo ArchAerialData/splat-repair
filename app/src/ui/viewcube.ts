@@ -242,13 +242,13 @@ export class ViewCube {
       ctx.beginPath();
       ctx.arc(it.p[0], it.p[1], it.neg ? 5 : 7.5, 0, Math.PI * 2);
       if (it.neg) {
-        ctx.fillStyle = hot ? it.a.colour : '#100c0a';
+        ctx.fillStyle = hot ? it.a.colour : '#171a1d';
         ctx.fill();
         ctx.strokeStyle = it.a.colour; ctx.stroke();
       } else {
         ctx.fillStyle = it.a.colour; ctx.fill();
-        if (hot) { ctx.strokeStyle = '#f1e9dc'; ctx.lineWidth = 1.5; ctx.stroke(); }
-        ctx.fillStyle = '#100c0a';
+        if (hot) { ctx.strokeStyle = '#edf2f4'; ctx.lineWidth = 1.5; ctx.stroke(); }
+        ctx.fillStyle = '#171a1d';
         ctx.font = '700 9.5px Prompt, Ubuntu, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(it.a.name, it.p[0], it.p[1] + 0.5);
@@ -267,9 +267,9 @@ export class ViewCube {
       ctx.closePath();
       // lit from the eye: faces turned away a little darker
       const l = 0.55 + 0.45 * facing;
-      ctx.fillStyle = `rgba(${Math.round(37 * l + 8)}, ${Math.round(28 * l + 6)}, ${Math.round(23 * l + 5)}, 0.96)`;
+      ctx.fillStyle = `rgba(${Math.round(45 * l + 8)}, ${Math.round(52 * l + 8)}, ${Math.round(58 * l + 8)}, 0.96)`;
       ctx.fill();
-      ctx.strokeStyle = '#4a3b31'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = '#465159'; ctx.lineWidth = 1; ctx.stroke();
       if (facing > 0.3) {
         // The name lies in the face, turned and squeezed with it: written
         // flat on the screen it ran past a face seen at an angle and under
@@ -282,7 +282,7 @@ export class ViewCube {
                          -dpr * (pv[0] - c[0]) * k, -dpr * (pv[1] - c[1]) * k,
                          dpr * c[0], dpr * c[1]);
         ctx.globalAlpha = Math.min(1, (facing - 0.3) / 0.4);
-        ctx.fillStyle = '#e9dfd0';
+        ctx.fillStyle = '#edf2f4';
         ctx.font = '500 11px Prompt, Ubuntu, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(f.name, 0, 0, this.scale * 1.8);
@@ -293,7 +293,7 @@ export class ViewCube {
       ctx.beginPath();
       this.hover.poly.forEach((p, k) => k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
       ctx.closePath();
-      ctx.fillStyle = 'rgba(229, 162, 98, 0.42)';
+      ctx.fillStyle = 'rgba(96, 165, 250, 0.42)';
       ctx.fill();
     }
     for (const it of ends) if (it.p[2] >= centreZ) drawAxis(it);

@@ -29,11 +29,11 @@ import { volumeShell, type Shell, type Volume } from './volume';
 import type { NavData } from './navpick';
 
 const CELL = 2;                 // CSS px per grid cell
-const LINE = 'rgba(229, 162, 98, 0.95)';     // whisky light, the stage's lead colour
+const LINE = 'rgba(96, 165, 250, 0.95)';     // blue, matching the interface accent
 const HALO = 'rgba(16, 12, 10, 0.62)';
-const LINE_HIDDEN = 'rgba(229, 162, 98, 0.55)';
+const LINE_HIDDEN = 'rgba(96, 165, 250, 0.55)';
 const HALO_HIDDEN = 'rgba(16, 12, 10, 0.35)';
-const WASH = [229, 162, 98, 26];             // rgba, alpha out of 255
+const WASH = [96, 165, 250, 26];             // rgba, alpha out of 255
 const WASH_HIDDEN = 10;
 /** Dash of the hidden part: on and off blocks of this many CSS px. */
 const DASH = 4;

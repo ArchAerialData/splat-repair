@@ -1118,8 +1118,8 @@ function drawGuides() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, r.width, r.height);
   ctx.lineWidth = 1.5;
-  ctx.strokeStyle = 'rgba(229, 162, 98, 0.95)';
-  ctx.fillStyle = 'rgba(229, 162, 98, 0.13)';
+  ctx.strokeStyle = 'rgba(96, 165, 250, 0.95)';
+  ctx.fillStyle = 'rgba(96, 165, 250, 0.13)';
 
   if (tool === 'lasso' && lassoPts.length > 1) {
     ctx.beginPath();

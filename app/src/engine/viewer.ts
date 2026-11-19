@@ -141,7 +141,7 @@ fn modifySplatColor(center: vec3f, color: ptr<function, vec4f>) {
     if (loadEditDel().r != 0u) {
         *color = vec4f((*color).rgb, 0.0);
     } else if (loadEditSel().r != 0u) {
-        *color = vec4f(mix((*color).rgb, vec3f(0.898, 0.635, 0.384), 0.6), (*color).a);
+        *color = vec4f(mix((*color).rgb, vec3f(0.376, 0.647, 0.980), 0.6), (*color).a);
     }
 }
 `;
@@ -185,7 +185,7 @@ void modifySplatColor(vec3 center, inout vec4 color) {
     if (loadEditDel().r != 0u) {
         color.a = 0.0;
     } else if (loadEditSel().r != 0u) {
-        color.rgb = mix(color.rgb, vec3(0.898, 0.635, 0.384), 0.6);
+        color.rgb = mix(color.rgb, vec3(0.376, 0.647, 0.980), 0.6);
     }
 }
 `;
